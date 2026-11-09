@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Coffet/oiep/actions/workflows/ci.yml/badge.svg)](https://github.com/Coffet/oiep/actions/workflows/ci.yml)
 
-**Open Interview Experience Platform** — a non-profit, self-hosted, community-run collection of real interview experiences.
+**Open Interview Experience Platform** — a non-profit, self-hosted, solo coded work and community-run collection of real interview experiences.
 
 No polished marketing copy. No paywalls. No corporate spin. Just what actually happened, from the people who were in the room.
 
@@ -58,7 +58,7 @@ Requirements: **JDK 17+**. Maven is not required; the Maven wrapper is included.
 ./mvnw spring-boot:run
 ```
 
-Then open <http://localhost:8080>.
+Then open [http://localhost:8080](http://localhost:8080).
 
 The SQLite database is created automatically at `data/oiep.db` (WAL mode). To use another location, set `OIEP_DB_PATH` or override the datasource URL:
 
@@ -104,7 +104,7 @@ OIEP_ADMIN_PASSWORD='choose-a-long-random-password' \
 java -jar target/oiep.war
 ```
 
-Then open **<http://localhost:8080/admin>** directly. The admin route is intentionally not linked from the public interface.
+Then open **[http://localhost:8080/admin](http://localhost:8080/admin)** directly. The admin route is intentionally not linked from the public interface.
 
 [![OIEP admin dashboard](docs/admin.png)](docs/admin.png)
 
@@ -118,7 +118,7 @@ With Docker Desktop (or Docker Engine) running:
 docker compose up -d --build
 ```
 
-Open <http://127.0.0.1:8080>. The database lives in the `oiep-data` Docker volume, so `docker compose down` keeps it; `docker compose down -v` deletes it.
+Open [http://127.0.0.1:8080](http://127.0.0.1:8080). The database lives in the `oiep-data` Docker volume, so `docker compose down` keeps it; `docker compose down -v` deletes it.
 
 ### Deploy to the internet (Docker + Cloudflare)
 
@@ -130,22 +130,23 @@ The repo includes a multi-stage `Dockerfile`, `compose.yaml` with an optional `t
 
 ## Routes
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/` | Index: anonymous debrief form + quiet lookup |
-| `POST` | `/reports` | Validate and publish a note |
-| `GET` | `/browse` | Search, filter and sort notes |
-| `GET` | `/reports/{id}` | Read a note |
-| `POST` | `/reports/{id}/helpful` | Mark a note useful (once per session) |
-| `GET` | `/about` | The longer story, roadmap and stack |
-| `GET` | `/language/{en\|zh-HK}` | Switch locale, safely redirect back |
-| `GET` | `/admin` | Admin dashboard (login required) |
-| `GET`, `POST` | `/admin/login` | Admin sign-in with CSRF token |
-| `POST` | `/admin/logout` | End the admin session |
-| `GET` | `/admin/reports/{id}` | Review a note inside the admin area |
-| `POST` | `/admin/reports/{id}/hide` | Hide a note from the public board |
-| `POST` | `/admin/reports/{id}/restore` | Restore a hidden note |
-| `GET`, `POST` | `/admin/reports/{id}/delete` | Confirmation page and permanent deletion |
+
+| Method        | Path                          | Purpose                                      |
+| ------------- | ----------------------------- | -------------------------------------------- |
+| `GET`         | `/`                           | Index: anonymous debrief form + quiet lookup |
+| `POST`        | `/reports`                    | Validate and publish a note                  |
+| `GET`         | `/browse`                     | Search, filter and sort notes                |
+| `GET`         | `/reports/{id}`               | Read a note                                  |
+| `POST`        | `/reports/{id}/helpful`       | Mark a note useful (once per session)        |
+| `GET`         | `/about`                      | The longer story, roadmap and stack          |
+| `GET`         | `/language/{en|zh-HK}`        | Switch locale, safely redirect back          |
+| `GET`         | `/admin`                      | Admin dashboard (login required)             |
+| `GET`, `POST` | `/admin/login`                | Admin sign-in with CSRF token                |
+| `POST`        | `/admin/logout`               | End the admin session                        |
+| `GET`         | `/admin/reports/{id}`         | Review a note inside the admin area          |
+| `POST`        | `/admin/reports/{id}/hide`    | Hide a note from the public board            |
+| `POST`        | `/admin/reports/{id}/restore` | Restore a hidden note                        |
+| `GET`, `POST` | `/admin/reports/{id}/delete`  | Confirmation page and permanent deletion     |
 
 ## Index design contract
 
@@ -239,12 +240,12 @@ GitHub Actions runs the same `./mvnw -B -ntp verify` suite on every push and pul
 
 ## Roadmap
 
-- [x] Core submission and search forms
-- [x] Round/location/mode/outcome tagging and filtering
-- [x] Lightweight usefulness rating
-- [x] Admin moderation dashboard with hide/restore/delete and login protection
-- [ ] Optional lightweight accounts for contributors/moderators
-- [ ] Screenshot/attachment storage with local + optional S3/MinIO dual-write and an outbox reconciler
-- [ ] Export and backup tools so the data stays portable
+- [X]  Core submission and search forms
+- [X]  Round/location/mode/outcome tagging and filtering
+- [X]  Lightweight usefulness rating
+- [X]  Admin moderation dashboard with hide/restore/delete and login protection
+- [ ]  Optional lightweight accounts for contributors/moderators
+- [ ]  Screenshot/attachment storage with local + optional S3/MinIO dual-write and an outbox reconciler
+- [ ]  Export and backup tools so the data stays portable
 
 The platform is designed to run on a single VPS, Docker, or a Raspberry Pi. Cloudflare can front static assets if desired.
