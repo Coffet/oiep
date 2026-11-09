@@ -1,0 +1,37 @@
+### Maven ###
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### OIEP runtime data ###
+data/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+backups/
+
+### Deployment secrets / local overrides ###
+.env
+.env.*
+!.env.example
+
+### IDE ###
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+nbproject/
+out/
+
+### OS / logs ###
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+logs/

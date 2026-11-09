@@ -1,0 +1,21 @@
+<a class="skip-link" href="#main"><spring:message code="skip.link"/></a>
+<header class="topbar" data-topbar>
+  <a class="brand" href="${ctx}/" aria-label="<spring:message code='site.logoAlt'/>">
+    <span class="brand__word">oiep</span>
+    <span class="brand__descriptor"><spring:message code="site.tagline"/></span>
+  </a>
+  <nav class="topbar__nav" aria-label="<spring:message code='nav.primary'/>">
+    <div class="lang-switch" role="group" aria-label="<spring:message code='nav.language'/>">
+      <c:url var="langEnUrl" value="/language/en">
+        <c:param name="returnTo" value="${empty currentUrl ? '/' : currentUrl}"/>
+      </c:url>
+      <c:url var="langZhUrl" value="/language/zh-HK">
+        <c:param name="returnTo" value="${empty currentUrl ? '/' : currentUrl}"/>
+      </c:url>
+      <a class="lang-switch__link ${isZh ? '' : 'is-current'}" href="${langEnUrl}" lang="en" hreflang="en" aria-label="<spring:message code='lang.en.aria'/>"<c:if test="${not isZh}"> aria-current="true"</c:if>>EN</a>
+      <span class="lang-switch__slash" aria-hidden="true">/</span>
+      <a class="lang-switch__link ${isZh ? 'is-current' : ''}" href="${langZhUrl}" lang="zh-HK" hreflang="zh-HK" aria-label="<spring:message code='lang.zh.aria'/>"<c:if test="${isZh}"> aria-current="true"</c:if>><spring:message code="lang.zh"/></a>
+    </div>
+    <a class="topbar__browse" href="${ctx}/browse"<c:if test="${activeNav eq 'browse'}"> aria-current="page"</c:if>><spring:message code="nav.browse"/></a>
+  </nav>
+</header>

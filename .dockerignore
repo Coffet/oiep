@@ -1,0 +1,20 @@
+# Keep the build context small and avoid shipping secrets or host data.
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+target
+data
+backups
+docs
+README.md
+.preview
+.idea
+.vscode
+*.iml
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.log

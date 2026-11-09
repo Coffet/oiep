@@ -1,0 +1,67 @@
+# OIEP — Docker Compose for a single small server.
+#
+# Local run (no Cloudflare):
+#   docker compose up -d --build
+#   -> http://127.0.0.1:8080
+#
+# Public run through Cloudflare Tunnel:
+#   1. put CLOUDFLARE_TUNNEL_TOKEN=... in .env
+#   2. docker compose --profile tunnel up -d --build
+#
+# The app port is bound to 127.0.0.1 on purpose: the tunnel reaches it over
+# the private Docker network, and strangers on the internet cannot hit port
+# 8080 directly. Read docs/DEPLOY.md before exposing anything.
+
+name: oiep
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: oiep:local
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: ${TZ:-Asia/Hong_Kong}
+      OIEP_DB_PATH: /data/oiep.db
+      OIEP_DEMO_DATA: ${OIEP_DEMO_DATA:-false}
+      OIEP_ADMIN_USERNAME: ${OIEP_ADMIN_USERNAME:-admin}
+      OIEP_ADMIN_PASSWORD: ${OIEP_ADMIN_PASSWORD:-}
+      # Cloudflare Tunnel forwards the real client IP in X-Forwarded-For.
+      # Safe here because the app port is bound to loopback only. Do not turn
+      # this on for a directly exposed instance (clients could spoof the header).
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    volumes:
+      - oiep-data:/data
+    ports:
+      - "127.0.0.1:${OIEP_PORT:-8080}:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    command: tunnel --no-autoupdate run
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  oiep-data:
+    # Fixed name so the backup/restore scripts can find it regardless of the
+    # directory name you cloned into.
+    name: oiep-data

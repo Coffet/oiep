@@ -1,0 +1,16 @@
+<footer class="site-footer">
+  <div class="site-footer__mark">
+    <span class="brand__word site-footer__word" aria-hidden="true">oiep</span>
+    <p class="site-footer__tagline"><spring:message code="footer.tagline"/></p>
+  </div>
+  <nav class="site-footer__nav" aria-label="<spring:message code='nav.footer'/>">
+    <a href="${ctx}/about"><spring:message code="footer.about"/></a>
+    <a href="${ctx}/browse"><spring:message code="footer.browse"/></a>
+    <a href="${ctx}/"><spring:message code="footer.back"/></a>
+    <a href="${ctx}/admin"><spring:message code="footer.admin"/></a>
+  </nav>
+  <div class="site-footer__base">
+    <p><spring:message code="footer.note"/></p>
+    <p class="site-footer__colophon"><spring:message code="footer.colophon"/></p>
+  </div>
+</footer>
