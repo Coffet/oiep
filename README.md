@@ -1,5 +1,7 @@
 # OIEP
 
+[![CI](https://github.com/Coffet/oiep/actions/workflows/ci.yml/badge.svg)](https://github.com/Coffet/oiep/actions/workflows/ci.yml)
+
 **Open Interview Experience Platform** — a non-profit, self-hosted, community-run collection of real interview experiences.
 
 No polished marketing copy. No paywalls. No corporate spin. Just what actually happened, from the people who were in the room.
@@ -226,6 +228,8 @@ The suite covers:
 - demo seeding only when explicitly enabled
 - home/browse/report/about routes and the styled error path
 - admin login redirects, CSRF rejection, login throttling, hide/restore/delete and hidden-report 404s
+
+GitHub Actions runs the same `./mvnw -B -ntp verify` suite on every push and pull request, then builds the Docker image and smoke-tests `/`, response headers and the `/admin` redirect.
 
 ## Fonts and licensing
 
