@@ -104,7 +104,7 @@ OIEP_ADMIN_PASSWORD='choose-a-long-random-password' \
 java -jar target/oiep.war
 ```
 
-Then open **<http://localhost:8080/admin>**. The link is also in the site footer.
+Then open **<http://localhost:8080/admin>** directly. The admin route is intentionally not linked from the public interface.
 
 [![OIEP admin dashboard](docs/admin.png)](docs/admin.png)
 

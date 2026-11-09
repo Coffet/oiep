@@ -7,7 +7,6 @@
     <a href="${ctx}/about"><spring:message code="footer.about"/></a>
     <a href="${ctx}/browse"><spring:message code="footer.browse"/></a>
     <a href="${ctx}/"><spring:message code="footer.back"/></a>
-    <a href="${ctx}/admin"><spring:message code="footer.admin"/></a>
   </nav>
   <div class="site-footer__base">
     <p><spring:message code="footer.note"/></p>

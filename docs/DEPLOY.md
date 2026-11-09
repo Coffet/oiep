@@ -271,7 +271,7 @@ The moderation page is:
 https://oiep.YOURDOMAIN.com/admin
 ```
 
-Sign in with the `OIEP_ADMIN_USERNAME` and `OIEP_ADMIN_PASSWORD` from `.env`. The footer also links to **Admin**. If the page says admin access is disabled, the password variable was empty when the container started; fix `.env` and run `docker compose --profile tunnel up -d --force-recreate`.
+Sign in with the `OIEP_ADMIN_USERNAME` and `OIEP_ADMIN_PASSWORD` from `.env`. Go directly to `/admin`; it is intentionally not linked from the public pages. If the page says admin access is disabled, the password variable was empty when the container started; fix `.env` and run `docker compose --profile tunnel up -d --force-recreate`.
 
 ### Step 5.7 — Reboot test
 
