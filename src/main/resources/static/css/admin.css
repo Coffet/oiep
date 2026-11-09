@@ -36,13 +36,27 @@
 
 .admin-login {
   width: min(100%, 31rem);
+  margin-inline: auto;
+}
+
+.page--admin-login {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
 }
 
 .admin-main--login {
+  flex: 1;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding-block: clamp(3rem, 8vh, 6.5rem) clamp(5rem, 10vh, 8rem);
+  align-items: center;
+  padding-block: clamp(2rem, 5vh, 4rem);
+}
+
+/* The login page is a single centered moment; the footer sits directly below it. */
+.page--admin-login .site-footer {
+  margin-top: 0;
 }
 
 .admin-login .display {
