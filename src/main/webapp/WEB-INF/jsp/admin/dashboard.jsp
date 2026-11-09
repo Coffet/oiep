@@ -14,7 +14,6 @@
 <%@ include file="../fragments/admin-topbar.jspf" %>
 <main id="main" class="admin-main" tabindex="-1">
   <header class="admin-hero">
-    <p class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span><spring:message code="admin.dashboard.eyebrow"/></p>
     <h1 class="display"><spring:message code="admin.dashboard.title"/></h1>
     <p class="admin-lead"><spring:message code="admin.dashboard.lead"/></p>
   </header>

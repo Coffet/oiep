@@ -14,7 +14,6 @@
 <%@ include file="../fragments/admin-topbar.jspf" %>
 <main id="main" class="admin-main admin-main--login" tabindex="-1">
   <div class="admin-login">
-    <p class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span><spring:message code="admin.login.eyebrow"/></p>
     <h1 class="display"><spring:message code="admin.login.title"/></h1>
     <p class="admin-lead"><spring:message code="admin.login.lead"/></p>
 
@@ -28,18 +27,20 @@
       <div class="admin-alert" role="alert"><spring:message code="${loginError}"/></div>
     </c:if>
 
-    <form class="admin-login__form" action="${ctx}/admin/login" method="post">
-      <input type="hidden" name="_csrf" value="<c:out value='${adminCsrfToken}'/>">
-      <p class="admin-field">
-        <label for="admin-username"><spring:message code="admin.login.username"/></label>
-        <input id="admin-username" name="username" type="text" autocomplete="username" required autofocus>
-      </p>
-      <p class="admin-field">
-        <label for="admin-password"><spring:message code="admin.login.password"/></label>
-        <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
-      </p>
-      <button class="admin-btn admin-btn--primary" type="submit"><spring:message code="admin.login.submit"/></button>
-    </form>
+    <c:if test="${adminConfigured}">
+      <form class="admin-login__form" action="${ctx}/admin/login" method="post">
+        <input type="hidden" name="_csrf" value="<c:out value='${adminCsrfToken}'/>">
+        <p class="admin-field">
+          <label for="admin-username"><spring:message code="admin.login.username"/></label>
+          <input id="admin-username" name="username" type="text" autocomplete="username" required autofocus>
+        </p>
+        <p class="admin-field">
+          <label for="admin-password"><spring:message code="admin.login.password"/></label>
+          <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
+        </p>
+        <button class="admin-btn admin-btn--primary" type="submit"><spring:message code="admin.login.submit"/></button>
+      </form>
+    </c:if>
 
     <a class="admin-back" href="${ctx}/"><spring:message code="admin.login.back"/></a>
   </div>

@@ -19,7 +19,6 @@
   </a>
 
   <header class="admin-hero admin-hero--delete">
-    <p class="eyebrow"><span class="eyebrow__dot" aria-hidden="true"></span><spring:message code="admin.delete.eyebrow"/></p>
     <h1 class="display"><spring:message code="admin.delete.title"/></h1>
     <p class="admin-lead"><spring:message code="admin.delete.lead"/></p>
   </header>

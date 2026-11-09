@@ -36,8 +36,6 @@
 
 .admin-login {
   width: min(100%, 31rem);
-  border-top: 1px solid var(--ink);
-  padding-top: clamp(1.5rem, 3vw, 2.5rem);
 }
 
 .admin-main--login {
