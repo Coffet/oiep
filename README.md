@@ -39,6 +39,7 @@ The first working slice:
 - **Bilingual UI** — English first, human-written standard written Traditional Chinese (`zh-HK`) available through the header toggle. Persisted in an `OIEP_LANG` cookie.
 - **About** — the full “why this exists”, roadmap and tech-stack copy lives on `/about`, keeping the index focused on the form.
 - **Admin / moderation** — password-protected `/admin` dashboard with note counts, search and status filters, hide/restore, delete-with-confirmation, per-session CSRF tokens, login throttling plus a login-page throttle, session rotation, a hard server-side session cap and no-store admin responses. Failed sign-ins, throttling and moderation actions are written to the security log with the resolved client address.
+- **Optional AI companion (oiep-backendAI)** — a self-contained, disabled-by-default component that plugs the separate local-first AI helper service in: a floating user-helper chat widget on the form page, a read-only experiences API for the companion's corpus sync, and an operator AI helper page at `/admin/assistant`. See [Optional AI companion](#optional-ai-companion-oiep-backendai).
 - **Ops basics** — SQLite out of the box, custom 404/500 pages, XSS-safe JSP output escaping, hash-based CSP with HSTS-on-HTTPS/COOP/CORP/X-Frame-Options, honeypot, per-client rate limiting keyed on the real visitor IP (Cloudflare `CF-Connecting-IP`; client-supplied `X-Forwarded-For` is never trusted), same-origin checks on anonymous POSTs, and cookie-only sessions with `Secure`/`HttpOnly`/`SameSite=Lax`.
 - **Deployment** — multi-stage Docker image, hardened Compose runtime (`cap_drop: ALL`, pids limits, no-new-privileges), persistent SQLite volume, Cloudflare Tunnel service, safe backup/restore scripts, Dependabot updates and a CI Docker smoke test that asserts the security headers, relative admin redirect and session-cookie flags.
 
@@ -113,23 +114,188 @@ The admin login is throttled, CSRF-protected and session-based. It only lets you
 
 ### Optional AI companion (oiep-backendAI)
 
-A separate, optional service — [oiep-backendAI](https://github.com/Coffet/oiep-backendAI), a local-first FastAPI process — can be plugged in next to OIEP. It is **off by default**: leave `OIEP_COMPANION_ENABLED` unset (or `false`) and OIEP serves the same pages and headers as before, with no new routes, page fragments or CSP changes. (The component's static JS/CSS files stay in the built artifact and are still served while the component is disabled; nothing references them, and the full-removal procedure deletes them.)
+A separate, optional service — [oiep-backendAI](https://github.com/Coffet/oiep-backendAI), a
+local-first FastAPI process — can be plugged in next to OIEP. It is **off by default**: leave
+`OIEP_COMPANION_ENABLED` unset (or `false`) and OIEP serves the same pages and headers as before,
+with no new routes, page fragments or CSP changes. (The component's static JS/CSS files stay in
+the built artifact and are still served while the component is disabled; nothing references them,
+and the full-removal procedure deletes them.)
 
-When enabled, the component adds three independent surfaces:
+The companion is deliberately *not* part of this repository: no model, prompt or chat code lives in
+the Spring app. The two projects speak two versioned REST contracts (a public user-helper API and a
+read-only OIEP experiences API) and stay independently deployable.
 
-- **User helper** — an optional web-chat widget: a compact launcher fixed to the bottom-right of the public form page opens the companion's own widget in a floating panel. The visitor's browser loads it directly from the companion's origin (OIEP only adds that exact origin to the CSP `frame-src`); the widget returns a prefill payload over `postMessage` and OIEP fills the matching form fields. Nothing is submitted automatically, and without JavaScript the launcher is a plain link to the standalone widget.
-- **Read-only experiences API** — `GET /api/v1/experiences`, consumed by the companion's admin corpus sync with a dedicated read-only bearer token. Hidden/deleted notes are propagated as tombstones.
-- **Admin helper** — `/admin/assistant` inside the existing admin area, proxied server-side so the companion's operator token never reaches the browser.
+#### What the component adds
 
-Enable it on bare metal with the environment variables documented in **[docs/COMPANION.md](docs/COMPANION.md)**, or run the optional Docker Compose overlay (the base `compose.yaml` is untouched):
+| Surface | Where | Enabled by |
+| --- | --- | --- |
+| **User helper** | Floating web-chat launcher (bottom-right) on the public form page `/`; opens a compact dialog with the companion's own widget | `OIEP_COMPANION_ENABLED` + `OIEP_COMPANION_USER_HELPER_ENABLED` |
+| **Read-only experiences API** | `GET /api/v1/experiences` (`oiep-read-api/v1`), pulled by the companion's operator corpus sync | `+ OIEP_COMPANION_READ_API_ENABLED` |
+| **Operator admin helper** | `/admin/assistant` inside the existing admin area, server-side proxy to the companion's `/v1/admin/*` | `+ OIEP_COMPANION_ADMIN_HELPER_ENABLED` (see the configuration table below) |
+
+**User helper UX.** A compact launcher fixed to the bottom-right corner of the landing page opens a
+small floating panel that embeds the companion widget in a sandboxed iframe. It is collapsed by
+default; `Esc`, the close button or a click outside collapses it again, and focus returns to the
+launcher. Without JavaScript the launcher is a plain link that opens the standalone widget (`/ui/`)
+in a new tab. The visitor's browser loads the widget directly from the companion's origin, and OIEP
+adds **exactly that origin** to the CSP `frame-src` (never a wildcard). A “Use the helper’s answers”
+button asks the widget for the reviewed draft and fills matching form fields over an
+origin-checked `postMessage` hand-off; it only fills empty fields, never overwrites answers and
+**never submits**. Every string is bilingual (English + human-written zh-HK).
+
+**Admin helper.** `/admin/assistant` is protected by the normal admin session; mutations require the
+per-session CSRF token, and the companion bearer token never reaches the browser. Only fixed
+companion routes are proxied (health, corpus stats/sync/audit, chat, query, summarise), request
+bodies are capped at 64 KB and reduced to an allowlist, and failures become a friendly `502`.
+
+**Read-only experiences API.** The companion pulls published notes with a dedicated read-only bearer
+token (`GET /api/v1/experiences?updated_since=&cursor=&page_size=`), keyset-paginated. Hidden and
+deleted notes are propagated as `deleted: true` tombstones through component-owned SQLite triggers,
+so the companion's mirror converges on the next sync; restoring a note brings it back. The API never
+exposes hidden notes, has no CORS, and answers every `/api/v1/**` response as JSON.
+
+#### Local walkthrough (Docker)
+
+Requirements: Docker Desktop/Engine, and a sibling checkout of the companion
+(`git clone https://github.com/Coffet/oiep-backendAI ../oiep-backendAI`). Start from this repository
+root.
+
+1. **Create `.env`** from `.env.example` and set the four secrets below. `.env` is gitignored;
+   never commit it. The overlay now *refuses to start* (`docker compose config` names the missing
+   variable) when a required secret is empty or a documented placeholder.
+
+   | Variable in `.env` | What it is | Requirement | Consumed by |
+   | --- | --- | --- | --- |
+   | `OIEP_ADMIN_USERNAME` / `OIEP_ADMIN_PASSWORD` | Your OIEP `/admin` login | password 16+ chars, not a documented placeholder | OIEP |
+   | `OIEP_COMPANION_ADMIN_TOKEN` | Companion operator bearer token (the overlay maps it to the companion's `OIEP_AI_ADMIN_TOKEN`) | **32+ chars** | both sides |
+   | `OIEP_COMPANION_READ_TOKEN` | Read-only token for the corpus-read API (mapped to `OIEP_AI_OIEP_SYNC_TOKEN`) | 16+ chars | both sides |
+   | `OIEP_AI_IP_HASH_SALT` | Salt the companion uses to hash visitor IPs | **16+ chars** | companion |
+
+   Generate them with:
+   `python -c "import secrets; print(secrets.token_urlsafe(48))"` for each token and
+   `python -c "import secrets; print(secrets.token_urlsafe(32))"` for the salt. The companion runs
+   with `OIEP_AI_ENV=prod` in the overlay, so it fails closed on weak/missing secrets.
+
+2. **Build and start both services:**
+
+   ```bash
+   docker compose -f compose.yaml -f compose.companion.yaml config   # validates .env + overlay
+   docker compose -f compose.yaml -f compose.companion.yaml up -d --build
+   docker compose -f compose.yaml -f compose.companion.yaml ps       # app + ai both healthy
+   docker compose -f compose.yaml -f compose.companion.yaml logs -f ai
+   ```
+
+3. **Open it:** public form and floating helper at [http://127.0.0.1:8080/](http://127.0.0.1:8080/),
+   admin login at [http://127.0.0.1:8080/admin](http://127.0.0.1:8080/admin) (credentials from
+   `.env`), AI operator page at `/admin/assistant`, the standalone widget at
+   [http://127.0.0.1:8090/ui/](http://127.0.0.1:8090/ui/), and the companion health check at
+   [http://127.0.0.1:8090/healthz](http://127.0.0.1:8090/healthz).
+
+   Local plain-HTTP caveat: the shipped Compose file marks the session cookie `Secure` for the HTTPS
+   deployment, so add `OIEP_SESSION_COOKIE_SECURE=false` to `.env` for an `http://127.0.0.1` admin
+   walkthrough. Never use `false` on a public HTTPS deployment.
+
+4. **Optional extras:**
+   - *Show the floating helper locally:* set `OIEP_COMPANION_USER_HELPER_ENABLED=true` and
+     `OIEP_COMPANION_WIDGET_URL=http://127.0.0.1:8090/ui/`, then
+     `docker compose … up -d --force-recreate app`.
+   - *Try corpus sync locally:* prod mode requires an HTTPS OIEP URL, so for a local demo set
+     `OIEP_AI_ENV=dev` and `OIEP_AI_OIEP_BASE_URL=http://app:8080`, recreate `ai`, then use
+     “Sync now” on `/admin/assistant`. For any public deployment keep `OIEP_AI_ENV=prod` with an
+     `https://` OIEP URL.
+
+   After upgrading the image, hard-refresh the page (`Ctrl+F5`): the companion CSS/JS filenames are
+   stable and served with normal cache headers.
+
+#### Bare metal / development
 
 ```bash
-docker compose -f compose.yaml -f compose.companion.yaml up -d --build
+# companion (separate repo, separate process)
+cd ../oiep-backendAI
+python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+export OIEP_AI_ENV=dev
+export OIEP_AI_ADMIN_TOKEN='<same value as OIEP_COMPANION_ADMIN_TOKEN>'
+uvicorn app.main:app --host 127.0.0.1 --port 8090 --workers 1   # exactly one worker
 ```
 
-The overlay builds the companion from a sibling `../oiep-backendAI` checkout (or an `OIEP_AI_IMAGE`), publishes it on loopback only, and wires the `app` environment. Soft-disable at any time with `OIEP_COMPANION_ENABLED=false`; the exact add/remove procedure — including the `scripts/companion-uninstall.sql` database step — is in [docs/COMPANION.md](docs/COMPANION.md).
+Then start OIEP (`./mvnw spring-boot:run`) with the `OIEP_COMPANION_*` variables described in
+[docs/COMPANION.md](docs/COMPANION.md). The two token pairs are the only credentials that must
+match across the two processes:
 
-> OIEP does not ask for interview difficulty or a multi-round history, so the companion's mirror carries a synthesized `difficulty` value and exactly one round entry per note. That limitation is stated plainly in the companion documentation.
+- `OIEP_COMPANION_ADMIN_TOKEN` ↔ companion `OIEP_AI_ADMIN_TOKEN`
+- `OIEP_COMPANION_READ_TOKEN` ↔ companion `OIEP_AI_OIEP_SYNC_TOKEN`
+
+#### Configuration at a glance
+
+All settings live under `oiep.companion.*`; each is exposed as an environment variable and the full
+reference (including companion-side variables and the add/remove procedure) is in
+**[docs/COMPANION.md](docs/COMPANION.md)**.
+
+| Property | Environment variable | Default |
+| --- | --- | --- |
+| `oiep.companion.enabled` | `OIEP_COMPANION_ENABLED` | `false` |
+| `oiep.companion.base-url` | `OIEP_COMPANION_BASE_URL` | *(empty)* — companion origin used server-side, e.g. `http://ai:8090` |
+| `oiep.companion.user-helper.enabled` | `OIEP_COMPANION_USER_HELPER_ENABLED` | `true` |
+| `oiep.companion.user-helper.widget-url` | `OIEP_COMPANION_WIDGET_URL` | `<base-url>/ui/` |
+| `oiep.companion.admin-helper.enabled` | `OIEP_COMPANION_ADMIN_HELPER_ENABLED` | `false` |
+| `oiep.companion.admin-helper.token` | `OIEP_COMPANION_ADMIN_TOKEN` | *(empty)* |
+| `oiep.companion.read-api.enabled` | `OIEP_COMPANION_READ_API_ENABLED` | `false` |
+| `oiep.companion.read-api.token` | `OIEP_COMPANION_READ_TOKEN` | *(empty)* |
+| `oiep.companion.read-api.page-size` | `OIEP_COMPANION_READ_PAGE_SIZE` | `200` (clamped 1–500) |
+| `oiep.companion.read-api.difficulty` | `OIEP_COMPANION_READ_DIFFICULTY` | `MODERATE` |
+| `oiep.companion.read-api.difficulty-mode` | `OIEP_COMPANION_READ_DIFFICULTY_MODE` | `constant` (or `vibe-proxy`) |
+| `oiep.companion.http.connect-timeout-ms` | `OIEP_COMPANION_CONNECT_TIMEOUT_MS` | `3000` |
+| `oiep.companion.http.request-timeout-ms` | `OIEP_COMPANION_REQUEST_TIMEOUT_MS` | `15000` |
+
+#### Security and privacy
+
+- Each sub-feature fails closed: a misconfigured token, base URL or widget URL registers **no** beans
+  (no route, no fragment, no CSP directive), and the startup log says why without ever printing a
+  secret.
+- The companion operator token is server-side only (proxy + startup config); the read token is
+  compared in constant time over SHA-256 digests and only unlocks the read-only experiences API. No
+  CORS on that API.
+- The user helper chat happens on the companion origin; OIEP receives no messages and stores no
+  transcript. The companion’s own policy applies: explicit consent before chatting, retention of
+  30 minutes idle / 2 hours hard cap, self-serve “delete my chat” with a receipt, optional improvement
+  dataset off by default, hashed IPs and no message bodies in logs. Adapt and publish the companion’s
+  privacy notice for your instance.
+- The admin proxy enforces the admin session + CSRF, forwards only fixed routes/allowlisted fields,
+  caps bodies, sets `no-store`/`noindex`, and never echoes the companion token.
+- Soft-disabling the component leaves its static JS/CSS files served (unreferenced), and — if the read
+  API was ever enabled — its SQLite triggers installed. The full-removal procedure deletes both.
+
+#### Data-mapping limits (read this before trusting corpus analytics)
+
+OIEP records one note per submission (company, role, the round the note is about, location, work mode,
+outcome, question-type tags, free text); it does not ask for an overall difficulty rating or a full
+multi-round history. The read API therefore emits a **synthesized `difficulty`** (constant
+`MODERATE` by default, or the documented `vibe-proxy` mapping) and exactly **one round entry** per
+note, with topics from the question-type tags. Treat difficulty/round-count analytics over
+OIEP-sourced rows as approximate; the mapping table lives in
+[docs/COMPANION.md](docs/COMPANION.md).
+
+#### Enable, disable, remove
+
+- **Enable:** set the env vars above (or use the overlay `.env`) and restart. The startup log prints
+  `AI companion component enabled: … userHelper=… adminHelper=… readApi=…`.
+- **Soft-disable:** `OIEP_COMPANION_ENABLED=false` and restart. The app behaves as before (only the
+  unreferenced static assets and, if installed, the inert DB triggers remain). The companion service
+  can keep running or be stopped independently.
+- **Full removal:** follow [docs/COMPANION.md → Adding and removing the component](docs/COMPANION.md).
+  The one ordering rule: run **[scripts/companion-uninstall.sql](scripts/companion-uninstall.sql)**
+  **before** deleting the component code — a trigger whose table is gone makes every `INSERT`/
+  `UPDATE`/`DELETE` on `reports` fail. Then delete the component files/assets/bundles/docs, revert the
+  small shared edits (`application.properties` block + messages basename; the two generic JSP extension
+  loops are inert and may stay), and remove the `OIEP_COMPANION_*` lines from `.env`.
+- **Verification after changes:** `./mvnw test` plus the checklists in the companion doc. The
+  independent report — including a full clean-removal simulation (141 pre-component tests still pass,
+  app boots with no companion log/routes/markup/DB objects) — is
+  [docs/COMPANION-VERIFICATION.md](docs/COMPANION-VERIFICATION.md).
+
+> CI runs the same suite on every push; the Docker smoke test still asserts the baseline security
+> headers/cookie flags for a default (component-off) deployment.
 
 ### Docker (local)
 
@@ -226,6 +392,7 @@ scripts/backup.sh, scripts/restore.sh  SQLite backup/restore helpers (0600 backu
 scripts/companion-uninstall.sql        drops the optional companion's read-API triggers/table (removal step)
 docs/DEPLOY.md                         hand-holding deployment guide
 docs/COMPANION.md                      optional AI companion reference, config and add/remove procedure
+docs/COMPANION-VERIFICATION.md         independent verification report (incl. clean-removal simulation)
 src/main/java/com/oiep/
   companion/                           optional AI companion component: user helper, admin proxy, read API
   config/                              JDBC/SQLite + locale + CSP configuration
@@ -245,7 +412,7 @@ src/main/resources/
   static/css/companion.css             optional user-helper styles
   static/css/companion-admin.css       optional admin-helper styles
   static/js/site.js                    minimal vanilla progressive enhancement
-  static/js/companion.js               optional user-helper prefill bridge (postMessage, no auto-submit)
+  static/js/companion.js               optional user-helper floating launcher + prefill bridge
   static/js/companion-admin.js         optional admin-helper page script
   static/fonts/                        webfonts + OFL for Instrument Sans
 src/main/webapp/WEB-INF/jsp/           JSP views and shared fragments
