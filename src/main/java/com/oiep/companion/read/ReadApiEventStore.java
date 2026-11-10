@@ -47,8 +47,20 @@ public class ReadApiEventStore {
     private static final Logger log = LoggerFactory.getLogger(ReadApiEventStore.class);
 
     /** Epoch milliseconds in SQLite (UTC; julianday is the documented portable spelling). */
-    private static final String NOW_MS =
+    private static final String RAW_NOW_MS =
             "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)";
+
+    /**
+     * Event time that never moves backwards relative to the existing log.
+     *
+     * <p>Using the wall clock alone lets a future timestamp (hand-edited/imported
+     * {@code created_at}, restored backup, clock skew) enter the log. A companion that has
+     * seen that future watermark would then ignore every later real event — including
+     * hide/delete tombstones — and silently keep serving hidden content. The monotonic
+     * guard keeps each trigger event strictly above the current maximum.</p>
+     */
+    private static final String NOW_MS =
+            "MAX(" + RAW_NOW_MS + ", (SELECT COALESCE(MAX(event_ms), 0) + 1 FROM " + EVENTS_TABLE + "))";
 
     private static final String CREATE_TABLE_SQL =
             "CREATE TABLE IF NOT EXISTS " + EVENTS_TABLE + " ("
@@ -138,6 +150,7 @@ public class ReadApiEventStore {
         List<Object[]> parameters = new ArrayList<>();
         long fallbackEventMs = System.currentTimeMillis();
         int withoutCreatedAt = 0;
+        int futureClamped = 0;
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT id, created_at, status FROM reports ORDER BY id");
         for (Map<String, Object> row : rows) {
@@ -151,6 +164,11 @@ public class ReadApiEventStore {
                 // rather than dropping it, but do not let it block startup.
                 eventMs = fallbackEventMs;
                 withoutCreatedAt++;
+            } else if (eventMs > fallbackEventMs) {
+                // Never seed the event log with a time in the future: a companion that
+                // adopted it as its watermark would ignore every later real event.
+                eventMs = fallbackEventMs;
+                futureClamped++;
             }
             int deleted = "published".equals(asText(row.get("status"))) ? 0 : 1;
             parameters.add(new Object[]{number.longValue(), eventMs, deleted});
@@ -163,6 +181,11 @@ public class ReadApiEventStore {
         if (withoutCreatedAt > 0) {
             log.warn("AI companion read API backfill: {} report(s) had no parsable created_at; "
                     + "using the boot time as their event time", withoutCreatedAt);
+        }
+        if (futureClamped > 0) {
+            log.warn("AI companion read API backfill: {} report(s) had a future created_at; "
+                    + "clamped to the boot time so later moderation events stay visible to "
+                    + "incremental syncs", futureClamped);
         }
         return (int) Math.max(0L, countEvents() - before);
     }

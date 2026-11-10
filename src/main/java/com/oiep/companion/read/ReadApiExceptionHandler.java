@@ -25,7 +25,7 @@ public class ReadApiExceptionHandler {
     @ExceptionHandler(ReadApiRequestException.class)
     public ResponseEntity<ReadApiError> handleRequestException(
             ReadApiRequestException exception, HttpServletResponse response) {
-        return error(exception.status(), exception.code(), response);
+        return error(exception.status(), exception.code(), exception.retryAfterSeconds(), response);
     }
 
     /**
@@ -36,11 +36,11 @@ public class ReadApiExceptionHandler {
     public ResponseEntity<ReadApiError> handleUnexpected(
             Exception exception, HttpServletResponse response) {
         log.error("AI companion read API request failed: {}", exception.getClass().getName());
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "internal_error", response);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "internal_error", 0, response);
     }
 
     private static ResponseEntity<ReadApiError> error(
-            HttpStatus status, String code, HttpServletResponse response) {
+            HttpStatus status, String code, int retryAfterSeconds, HttpServletResponse response) {
         // JSON is preset for every error, whatever the request's Accept header says: this
         // namespace must never render the application's HTML error page or a 406.
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -48,6 +48,9 @@ public class ReadApiExceptionHandler {
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(status);
         if (status == HttpStatus.UNAUTHORIZED) {
             builder.header(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        }
+        if (retryAfterSeconds > 0) {
+            builder.header(HttpHeaders.RETRY_AFTER, Integer.toString(retryAfterSeconds));
         }
         return builder.body(ReadApiError.of(code));
     }

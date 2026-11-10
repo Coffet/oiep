@@ -61,8 +61,14 @@ public abstract class ReadApiEnabledTestSupport {
     @Autowired
     protected ReadApiEventStore eventStore;
 
+    @Autowired
+    protected ReadApiRateLimiter readApiRateLimiter;
+
     @BeforeEach
     void resetReadApiState() {
+        // The throttle is per-application-context state: reset it so one test's request
+        // volume cannot make the next test flaky.
+        readApiRateLimiter.reset();
         jdbcTemplate.update("DELETE FROM reports");
         jdbcTemplate.update("DELETE FROM " + ReadApiEventStore.EVENTS_TABLE);
     }

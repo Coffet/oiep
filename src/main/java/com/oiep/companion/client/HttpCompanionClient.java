@@ -6,7 +6,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -86,23 +88,57 @@ public class HttpCompanionClient implements CompanionClient {
         } else {
             builder.GET();
         }
-        HttpResponse<String> response;
+        HttpResponse<InputStream> response;
+        String body;
         try {
-            response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+            body = readBoundedBody(response.body());
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new CompanionUnavailableException("The companion request was interrupted", ex);
+        } catch (CompanionUnavailableException ex) {
+            // Keep the specific (already sanitised) reason, e.g. "response was too large".
+            throw ex;
         } catch (IOException | RuntimeException ex) {
             throw new CompanionUnavailableException("The companion service could not be reached", ex);
         }
-        String body = response.body() == null ? "" : response.body();
-        if (body.length() > MAX_BODY_BYTES) {
-            throw new CompanionUnavailableException("The companion response was too large");
+        if (body.contains(adminToken)) {
+            // Defence in depth for a compromised or buggy companion: an operator credential
+            // must never be reflected into the browser through the proxy.
+            log.warn("AI companion response contained the operator credential; refusing to pass it through");
+            throw new CompanionUnavailableException("The companion response contained a credential");
         }
         if (response.statusCode() >= 500) {
             log.warn("AI companion request failed path={} status={}", pathAndQuery, response.statusCode());
         }
         return new CompanionResponse(response.statusCode(), body);
+    }
+
+    /**
+     * Reads the response body while enforcing the byte ceiling.
+     *
+     * <p>The stream is consumed incrementally, so a hostile or misconfigured companion cannot
+     * make the OIEP process buffer an arbitrarily large body before the size check (the old
+     * implementation buffered the whole response and compared a character count).</p>
+     */
+    private String readBoundedBody(InputStream stream) throws IOException {
+        if (stream == null) {
+            return "";
+        }
+        try (InputStream input = stream) {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream(8192);
+            byte[] chunk = new byte[8192];
+            int total = 0;
+            int read;
+            while ((read = input.read(chunk)) != -1) {
+                total += read;
+                if (total > MAX_BODY_BYTES) {
+                    throw new CompanionUnavailableException("The companion response was too large");
+                }
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toString(StandardCharsets.UTF_8);
+        }
     }
 
     /**

@@ -122,7 +122,7 @@ class CompanionUserHelperEnabledEndToEndTests {
         assertThat(html).contains("Form helper");
         assertThat(html).contains("loading=\"lazy\"");
         assertThat(html).contains("referrerpolicy=\"no-referrer\"");
-        assertThat(html).contains("sandbox=\"allow-scripts allow-forms allow-same-origin\"");
+        assertThat(html).contains("sandbox=\"allow-scripts allow-forms allow-same-origin allow-modals\"");
         assertThat(html).contains("allow=\"clipboard-write\"");
         assertThat(html).contains("title=\"Interview-experience helper\"");
         assertThat(html).contains("/css/companion.css");

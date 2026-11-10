@@ -197,6 +197,9 @@ Values copied verbatim from this document or `.env.example` as tokens are detect
 | `oiep.companion.read-api.page-size` | `OIEP_COMPANION_READ_PAGE_SIZE` | `200` | default page size (clamped 1–500; the service maximum) | the companion requests pages of at most 500 |
 | `oiep.companion.read-api.difficulty` | `OIEP_COMPANION_READ_DIFFICULTY` | `MODERATE` | value emitted for every item when difficulty mode is `constant` (see [the difficulty limitation](#the-difficulty-limitation-read-this-before-trusting-difficulty-analytics)) | — |
 | `oiep.companion.read-api.difficulty-mode` | `OIEP_COMPANION_READ_DIFFICULTY_MODE` | `constant` | `constant` or `vibe-proxy` | — |
+| `oiep.companion.read-api.rate-limit.max-requests` | `OIEP_COMPANION_READ_RATE_LIMIT_MAX_REQUESTS` | `120` | per-client requests per window, counting failed bearer attempts too (`429` + `Retry-After`); the bucket map is bounded | — |
+| `oiep.companion.read-api.rate-limit.window-seconds` | `OIEP_COMPANION_READ_RATE_LIMIT_WINDOW_SECONDS` | `60` | throttle window | — |
+| `oiep.companion.read-api.rate-limit.max-tracked-clients` | `OIEP_COMPANION_READ_RATE_LIMIT_MAX_TRACKED_CLIENTS` | `10000` | hard cap on tracked clients (oldest non-global buckets are evicted) | — |
 | `oiep.companion.http.connect-timeout-ms` | `OIEP_COMPANION_CONNECT_TIMEOUT_MS` | `3000` | admin proxy connect timeout | — |
 | `oiep.companion.http.request-timeout-ms` | `OIEP_COMPANION_REQUEST_TIMEOUT_MS` | `15000` | admin proxy request timeout | — |
 
@@ -214,6 +217,8 @@ The matching companion-side settings you will actually set (see the companion's
 | `OIEP_AI_SYNC_ENABLED` | `false` | background sync; the operator can always trigger a sync from `/admin/assistant` |
 | `OIEP_AI_UI_ENABLED` | `true` | serve the widget at `/ui/` |
 | `OIEP_AI_CORS_ORIGINS` | *(empty)* | only needed if the widget is hosted off-origin; the iframe embed does **not** need CORS |
+| `OIEP_AI_WIDGET_PARENT_ORIGINS` | *(empty)* | comma-separated browser origin(s) allowed to embed `/ui/` (the public OIEP origin, e.g. `https://oiep.example`). When set: CSP `frame-ancestors` + the widget answers the prefill `postMessage` hand-off only to those origins. When empty the hand-off is disabled (fail closed) and a production warning is logged |
+| `OIEP_AI_TRUSTED_PROXIES` | *(empty in the overlay)* | proxy networks whose `X-Forwarded-For` / `CF-Connecting-IP` headers are trusted. Never use broad RFC1918 ranges or `127.0.0.1`: any process/container that can reach the port could forge the rate-limit and audit identity. For Cloudflare Tunnel set the exact cloudflared address/subnet |
 
 ### Tokens: generate real ones
 
@@ -358,11 +363,16 @@ How the overlay wires things:
 - `OIEP_AI_ENV=prod` refuses a plain-HTTP `OIEP_AI_OIEP_BASE_URL`, so a corpus sync points at the
   **public HTTPS OIEP URL** (`OIEP_AI_OIEP_BASE_URL=https://oiep.example`), not at
   `http://app:8080`. Leave it empty to run without sync.
-- The overlay defaults `OIEP_AI_TRUSTED_PROXIES` to the private Docker ranges because requests from
-  the `cloudflared` container arrive on the Compose network; that lets the companion read the real
-  visitor address from `X-Forwarded-For` for per-IP rate limits and hashed-IP audit rows. If you
-  leave the companion's stock default (`127.0.0.1/32,::1/128`), every visitor appears to come from
-  the tunnel container and shares one rate-limit bucket.
+- The overlay leaves `OIEP_AI_TRUSTED_PROXIES` empty (trust no proxy headers). Requests from the
+  `cloudflared` container therefore all appear to come from the tunnel container and share one
+  rate-limit bucket. For a real Cloudflare Tunnel deployment set it to the **exact** cloudflared
+  container address/subnet (the companion prefers `CF-Connecting-IP` from a trusted peer). Do not
+  use broad private ranges: any container or host process that can reach the published port could
+  otherwise forge the per-IP rate limits, the admin IP allowlist and the hashed audit identity.
+- Set `OIEP_AI_WIDGET_PARENT_ORIGINS` to the public OIEP origin (e.g.
+  `https://oiep.example`). Without it the widget still renders, but the "Use the helper's
+  answers" hand-off is disabled (the widget refuses to reply to a cross-origin parent) and a
+  startup warning is logged.
 - The overlay does **not** include the optional local Ollama model; the default
   `structured-extractive` backend needs no model. See the companion's own deployment docs for
   the optional local model.
@@ -631,6 +641,11 @@ Behaviour:
 - If you restore an OIEP database backup that was taken **before** the component was enabled, the
   companion's mirror can be stale: trigger a **full** resync (`POST /v1/admin/corpus/sync` with
   `{"full": true}` on the companion) after restoring.
+- Event times in the read API log are monotonic (each trigger event is strictly newer than the
+  current maximum; a future `created_at` in an imported/restored database is clamped to boot time),
+  so a companion watermark can never hide later hide/delete tombstones. After a restore, a clock
+  change or a watermark you are unsure about, a **full** resync (`{"full": true}`) is still the
+  safest recovery and is always supported.
 
 The component's own startup line confirms the setup:
 `AI companion read API event store ready: triggers installed, backfilled N existing report event(s)`.
@@ -655,10 +670,15 @@ is removed; see [Full removal](#c-full-removal).
   a body of at most 64 KB, an allowlisted route and allowlisted top-level JSON fields. The proxy
   never forwards cookies, never follows redirects and never echoes companion authentication
   failures (401/403 become a generic `502 companion_auth_failed`).
-- **Read API:** bearer token only, constant-time comparison over SHA-256 digests, published reports
-  only, no CORS, no caching, no query echo. A stolen read token can read what the public board
-  already shows — no more. Revoke it by changing `OIEP_COMPANION_READ_TOKEN` on OIEP and
-  `OIEP_AI_OIEP_SYNC_TOKEN` on the companion, then restart both.
+- **Read API:** bearer token only, constant-time comparison over SHA-256 digests, published
+  report *content* only, per-client throttle (including failed bearer attempts), no CORS, no
+  caching, no query echo. The namespace is the public `/api/v1/` path, so treat the token as
+  reachable by anyone who can reach OIEP's public ingress: it is protected by a 16+ character
+  secret and by the rate limit, and it must not be shared with untrusted parties. Beyond the
+  public board it also exposes **moderation metadata** for hidden/deleted reports (their numeric
+  ids and exact hide/delete timestamps, as tombstones); it never exposes their content. Rotate by
+  changing `OIEP_COMPANION_READ_TOKEN` on OIEP and `OIEP_AI_OIEP_SYNC_TOKEN` on the companion, then
+  restart both (a full resync recovers the mirror).
 - **Companion public exposure:** the operator must keep the companion's `/v1/admin/` blocked at the
   public reverse proxy (the companion's own `docs/SECURITY.md` requires a 404 on the public vhost).
   A token is not an exposure boundary. Verify from outside:
@@ -679,7 +699,10 @@ is removed; see [Full removal](#c-full-removal).
   **30 minutes of idle** and in any case after **2 hours**; the visitor can delete the chat at any
   time in the widget (self-serve `DELETE`, with an erasure receipt). The optional improvement
   dataset is **opt-in and off by default**; when enabled it keeps only the final structured form
-  (never chat messages) for up to 30 days, and deleting the chat withdraws it.
+  (never chat messages) for up to 30 days, and deleting the chat withdraws it. If the chat expired
+  before the visitor deleted it, the expiring session writes an erasure receipt so a later
+  `DELETE /v1/user/sessions/{id}` with the session token still withdraws the retained sample (the
+  operator erasure endpoint works the same way).
 - **Consent is collected by the widget**, from the machine-readable notice at `GET /v1/privacy`;
   no session can start without `consent.form_assist: true`.
 - **What OIEP exposes to the companion** is only what the public board already shows (`published`
@@ -738,6 +761,11 @@ OIEP_COMPANION_ENABLED=false
   events into `companion_report_events` (harmless, and useful if you re-enable later). They are
   removed only by the full-removal SQL.
 - Restart OIEP after changing the variables.
+- A moderation action taken while the read API is **uninstalled** (or while it had never been
+  enabled) is not recorded: re-enabling backfills the then-current published rows, but a report
+  hidden/deleted during the gap has no tombstone. After any uninstall/re-enable cycle run a
+  **full** companion resync. Soft-disabling (`OIEP_COMPANION_ENABLED=false`) keeps the triggers
+  installed and does not have this gap.
 
 ### C. Full removal
 
@@ -779,6 +807,9 @@ exists and you still have its trigger definitions in the repository.
 
 If you ever restore an OIEP backup that was taken while the component was enabled (the backup
 contains the triggers/table), run the script again after the restore.
+
+After re-enabling the read API later, run a **full** companion resync: moderation changes made
+while the read API was removed were not recorded as events (see the soft-disable note above).
 
 #### Step 3 — Delete the component files
 

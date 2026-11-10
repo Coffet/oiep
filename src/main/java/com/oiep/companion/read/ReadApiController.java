@@ -1,6 +1,8 @@
 package com.oiep.companion.read;
 
 import com.oiep.companion.CompanionConditions;
+import com.oiep.web.ClientAddressResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.http.HttpHeaders;
@@ -21,6 +23,10 @@ import org.springframework.web.bind.annotation.RestController;
  * only when the component and the read API are enabled with a usable token: with the default
  * configuration the route is absent (404), exactly like any other unknown page.</p>
  *
+ * <p>Every request (including failed authentication attempts) is throttled per client before
+ * the token is checked, and the token comparison is constant time; together they make online
+ * guessing impractical and keep unauthenticated 401 traffic from being free.</p>
+ *
  * <p>Responses always carry {@code Cache-Control: no-store} and {@code X-Robots-Tag: noindex}
  * and never CORS headers. Errors use the fixed JSON envelope
  * {@code {"error":{"code":"..."}}}; neither the token nor any query value is echoed back.</p>
@@ -40,10 +46,16 @@ public class ReadApiController {
 
     private final ReadApiAuth auth;
     private final ReadApiService service;
+    private final ReadApiRateLimiter rateLimiter;
+    private final ClientAddressResolver clientAddressResolver;
 
-    public ReadApiController(ReadApiAuth auth, ReadApiService service) {
+    public ReadApiController(ReadApiAuth auth, ReadApiService service,
+                             ReadApiRateLimiter rateLimiter,
+                             ClientAddressResolver clientAddressResolver) {
         this.auth = auth;
         this.service = service;
+        this.rateLimiter = rateLimiter;
+        this.clientAddressResolver = clientAddressResolver;
     }
 
     @GetMapping(EXPERIENCES_PATH)
@@ -52,11 +64,16 @@ public class ReadApiController {
             @RequestParam(value = "updated_since", required = false) String updatedSince,
             @RequestParam(value = "cursor", required = false) String cursor,
             @RequestParam(value = "page_size", required = false) String pageSize,
+            HttpServletRequest request,
             HttpServletResponse response) {
         // Preset a concrete content type: Spring then skips Accept negotiation, so a browser or
         // hostile Accept header can never fall back to the HTML error page.
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         ReadApiHeaders.apply(response);
+        String client = clientAddressResolver.resolve(request);
+        if (!rateLimiter.allow(client)) {
+            throw ReadApiRequestException.rateLimited((int) rateLimiter.retryAfterSeconds());
+        }
         if (!auth.isAuthorized(authorization)) {
             throw ReadApiRequestException.unauthorized();
         }

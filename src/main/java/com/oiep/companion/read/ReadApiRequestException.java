@@ -15,11 +15,17 @@ public final class ReadApiRequestException extends RuntimeException {
 
     private final HttpStatus status;
     private final String code;
+    private final int retryAfterSeconds;
 
     private ReadApiRequestException(HttpStatus status, String code) {
+        this(status, code, 0);
+    }
+
+    private ReadApiRequestException(HttpStatus status, String code, int retryAfterSeconds) {
         super(code, null, false, false);
         this.status = status;
         this.code = code;
+        this.retryAfterSeconds = Math.max(0, retryAfterSeconds);
     }
 
     /** Missing or invalid bearer credentials: 401 {@code unauthorized}. */
@@ -32,11 +38,21 @@ public final class ReadApiRequestException extends RuntimeException {
         return new ReadApiRequestException(HttpStatus.BAD_REQUEST, code);
     }
 
+    /** Per-client throttle exhausted: 429 {@code rate_limited} with a Retry-After value. */
+    public static ReadApiRequestException rateLimited(int retryAfterSeconds) {
+        return new ReadApiRequestException(
+                HttpStatus.TOO_MANY_REQUESTS, "rate_limited", retryAfterSeconds);
+    }
+
     public HttpStatus status() {
         return status;
     }
 
     public String code() {
         return code;
+    }
+
+    public int retryAfterSeconds() {
+        return retryAfterSeconds;
     }
 }

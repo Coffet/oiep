@@ -406,12 +406,14 @@
     if (!data || typeof data !== "object" || typeof data.type !== "string") return;
 
     const replyRequestId = typeof data.requestId === "string" ? data.requestId : null;
+    // Accept only the answer to the request this page actually sent. Unsolicited
+    // messages and stale replies after the timeout must not change the visitor's form.
     if (
-      pendingRequestId !== null &&
-      replyRequestId !== null &&
+      pendingRequestId === null ||
+      replyRequestId === null ||
       replyRequestId !== pendingRequestId
     ) {
-      return; // stale reply to an older request
+      return;
     }
 
     if (data.type === "oiep-ai:prefill-unavailable") {

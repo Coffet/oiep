@@ -37,7 +37,7 @@
   <spring:message code="companion.helper.skipped" var="msgSkipped"/>
   <spring:message code="companion.helper.notReady" var="msgNotReady"/>
   <spring:message code="companion.helper.unavailable" var="msgUnavailable"/>
-  <link rel="stylesheet" href="${ctx}/css/companion.css?v=20261112a">
+  <link rel="stylesheet" href="${ctx}/css/companion.css?v=20261112b">
   <div class="companion-helper" data-companion-helper
       data-widget-origin="${fn:escapeXml(helper.widgetOrigin)}"
       data-msg-launcher="${fn:escapeXml(msgLauncher)}"
@@ -107,7 +107,7 @@
             title="${fn:escapeXml(msgIframeTitle)}"
             loading="lazy"
             referrerpolicy="no-referrer"
-            sandbox="allow-scripts allow-forms allow-same-origin"
+            sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
             allow="clipboard-write"
             aria-describedby="companion-helper-hint"></iframe>
       </div>
@@ -123,5 +123,5 @@
       </div>
     </div>
   </div>
-  <script src="${ctx}/js/companion.js?v=20261112a" defer></script>
+  <script src="${ctx}/js/companion.js?v=20261112b" defer></script>
 </c:if>

@@ -293,7 +293,7 @@ OIEP-sourced rows as approximate; the mapping table lives in
 - **Verification after changes:** `./mvnw test` plus the checklists in the companion doc. The
   independent report — including a full clean-removal simulation (141 pre-component tests still pass,
   app boots with no companion log/routes/markup/DB objects) — is
-  [docs/COMPANION-VERIFICATION.md](docs/COMPANION-VERIFICATION.md).
+  [docs/COMPANION-VERIFICATION-ROUND2.md](docs/COMPANION-VERIFICATION-ROUND2.md).
 
 > CI runs the same suite on every push; the Docker smoke test still asserts the baseline security
 > headers/cookie flags for a default (component-off) deployment.
@@ -419,8 +419,16 @@ src/main/resources/
 src/main/webapp/WEB-INF/jsp/           JSP views and shared fragments
 src/main/webapp/WEB-INF/jsp/admin/     admin login, dashboard, detail, delete pages
 src/main/webapp/WEB-INF/jsp/companion/ optional user-helper and admin-helper views
-src/test/java/com/oiep/                322 tests
+src/test/java/com/oiep/                330 tests
 ```
+
+## Security hardening (second adversarial round)
+
+The optional companion and its OIEP integration were pen-tested again with live browser,
+raw-HTTP and container-level attacks. Findings and fixes are consolidated in
+[docs/COMPANION-VERIFICATION-ROUND2.md](docs/COMPANION-VERIFICATION-ROUND2.md) and the
+security/ reports; the app-side additions are covered by the tests listed below
+(sync-watermark monotonicity, read-API throttling, bounded companion responses).
 
 ## Tests
 

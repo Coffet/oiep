@@ -77,6 +77,12 @@ services:
       OIEP_COMPANION_CONNECT_TIMEOUT_MS: ${OIEP_COMPANION_CONNECT_TIMEOUT_MS:-3000}
       OIEP_COMPANION_REQUEST_TIMEOUT_MS: ${OIEP_COMPANION_REQUEST_TIMEOUT_MS:-15000}
 
+      # Per-client throttle for the public read API (all requests, including failed
+      # bearer attempts). 429 + Retry-After when exhausted; the bucket map is bounded.
+      OIEP_COMPANION_READ_RATE_LIMIT_MAX_REQUESTS: ${OIEP_COMPANION_READ_RATE_LIMIT_MAX_REQUESTS:-120}
+      OIEP_COMPANION_READ_RATE_LIMIT_WINDOW_SECONDS: ${OIEP_COMPANION_READ_RATE_LIMIT_WINDOW_SECONDS:-60}
+      OIEP_COMPANION_READ_RATE_LIMIT_MAX_TRACKED_CLIENTS: ${OIEP_COMPANION_READ_RATE_LIMIT_MAX_TRACKED_CLIENTS:-10000}
+
   # ---------------------------------------------------------------------------
   # oiep-backendAI companion service.
   # Bridge networking (not the companion's host-network default) so the process
@@ -136,14 +142,19 @@ services:
       OIEP_AI_MODEL_BACKEND: ${OIEP_AI_MODEL_BACKEND:-extractive}
       OIEP_AI_IMPROVEMENT_ENABLED: ${OIEP_AI_IMPROVEMENT_ENABLED:-true}
 
-      # Behind the Cloudflare Tunnel, requests reach the companion from the
-      # cloudflared container on the Compose network. Trusting the private
-      # Docker ranges lets the service read the real visitor address from
-      # X-Forwarded-For for per-IP rate limits and hashed-IP audit rows; with the
-      # companion's stock default (127.0.0.1 only) every visitor would appear to
-      # come from the tunnel container. Narrow this to your exact Compose network
-      # CIDR if you know it.
-      OIEP_AI_TRUSTED_PROXIES: ${OIEP_AI_TRUSTED_PROXIES:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16,127.0.0.1/32,::1/128}
+      # Browser origins allowed to embed the /ui/ widget (the public OIEP origin).
+      # When set, the widget answers the prefill hand-off only to these origins and
+      # /ui/ carries a CSP frame-ancestors restriction; empty disables the hand-off
+      # (fail closed) and logs a production warning.
+      OIEP_AI_WIDGET_PARENT_ORIGINS: ${OIEP_AI_WIDGET_PARENT_ORIGINS:-}
+
+      # SECURITY: empty = no proxy headers are trusted (per-IP rate limits and the
+      # admin allowlist then see the Docker peer address, not the visitor). Do NOT
+      # trust broad RFC1918 ranges or 127.0.0.1: any container/process that can reach
+      # the published port could then forge the rate-limit/audit identity. For a
+      # Cloudflare Tunnel deployment set this to the exact cloudflared container
+      # address/subnet; the companion prefers CF-Connecting-IP from a trusted peer.
+      OIEP_AI_TRUSTED_PROXIES: ${OIEP_AI_TRUSTED_PROXIES:-}
     volumes:
       # Companion SQLite database (sessions, corpus mirror, audit, receipts).
       # Back it up with the companion's documented sqlite3 .backup procedure.

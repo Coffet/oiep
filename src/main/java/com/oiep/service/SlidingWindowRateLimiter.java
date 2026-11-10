@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * keys, the oldest buckets are dropped once the hard cap is exceeded. That keeps the limiter
  * from becoming a memory-exhaustion vector itself.</p>
  */
-abstract class SlidingWindowRateLimiter {
+public abstract class SlidingWindowRateLimiter {
 
     private final int maxRequests;
     private final long windowMillis;
@@ -24,7 +24,7 @@ abstract class SlidingWindowRateLimiter {
     private final Clock clock;
     private final ConcurrentHashMap<String, Deque<Long>> attempts = new ConcurrentHashMap<>();
 
-    SlidingWindowRateLimiter(int maxRequests, long windowSeconds, int maxEntries, Clock clock) {
+    protected SlidingWindowRateLimiter(int maxRequests, long windowSeconds, int maxEntries, Clock clock) {
         this.maxRequests = Math.max(1, maxRequests);
         this.windowMillis = Math.max(1L, windowSeconds) * 1000L;
         this.maxEntries = Math.max(16, maxEntries);
@@ -35,7 +35,7 @@ abstract class SlidingWindowRateLimiter {
      * Records one attempt for the given client key and returns {@code false} when the client
      * has used up the allowed attempts inside the current window.
      */
-    boolean tryAcquire(String clientKey) {
+    protected boolean tryAcquire(String clientKey) {
         String bucket = (clientKey == null || clientKey.isBlank()) ? "unknown" : clientKey;
         long now = clock.millis();
         long cutoff = now - windowMillis;
@@ -61,7 +61,7 @@ abstract class SlidingWindowRateLimiter {
     }
 
     /** Test/support hook: forget all buckets. */
-    void reset() {
+    protected void reset() {
         attempts.clear();
     }
 

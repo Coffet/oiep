@@ -77,7 +77,7 @@ class CompanionUserHelperFragmentContractTests {
         assertThat(jsp).contains("src=\"${fn:escapeXml(helper.widgetUrl)}\"");
         assertThat(jsp).contains("loading=\"lazy\"");
         assertThat(jsp).contains("referrerpolicy=\"no-referrer\"");
-        assertThat(jsp).contains("sandbox=\"allow-scripts allow-forms allow-same-origin\"");
+        assertThat(jsp).contains("sandbox=\"allow-scripts allow-forms allow-same-origin allow-modals\"");
         assertThat(jsp).contains("allow=\"clipboard-write\"");
         assertThat(jsp).contains("title=\"${fn:escapeXml(msgIframeTitle)}\"");
         // The widget URL comes from validated server configuration, never hard-coded in the
