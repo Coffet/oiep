@@ -37,7 +37,7 @@
   <spring:message code="companion.helper.skipped" var="msgSkipped"/>
   <spring:message code="companion.helper.notReady" var="msgNotReady"/>
   <spring:message code="companion.helper.unavailable" var="msgUnavailable"/>
-  <link rel="stylesheet" href="${ctx}/css/companion.css?v=20261111a">
+  <link rel="stylesheet" href="${ctx}/css/companion.css?v=20261111b">
   <div class="companion-helper" data-companion-helper
       data-widget-origin="${fn:escapeXml(helper.widgetOrigin)}"
       data-msg-launcher="${fn:escapeXml(msgLauncher)}"
@@ -83,7 +83,8 @@
         <span class="companion-helper__headtext">
           <span class="companion-helper__title" id="companion-helper-heading"><c:out value="${msgLauncher}"/></span>
           <span class="companion-helper__byline">
-            <span class="companion-helper__dot" aria-hidden="true"></span><c:out value="${msgKicker}"/>
+            <span class="companion-helper__dot" aria-hidden="true"></span>
+            <span class="companion-helper__kicker"><c:out value="${msgKicker}"/></span>
             <span class="companion-helper__optional"><c:out value="${msgOptional}"/></span>
           </span>
         </span>
@@ -122,5 +123,5 @@
       </div>
     </div>
   </div>
-  <script src="${ctx}/js/companion.js?v=20261111a" defer></script>
+  <script src="${ctx}/js/companion.js?v=20261111b" defer></script>
 </c:if>
