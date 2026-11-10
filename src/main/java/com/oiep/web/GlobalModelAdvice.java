@@ -1,6 +1,8 @@
 package com.oiep.web;
 
+import com.oiep.web.ui.PageExtension;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.servlet.ModelAndView;
 
 import java.time.Year;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -17,6 +20,22 @@ import java.util.Locale;
  */
 @ControllerAdvice
 public class GlobalModelAdvice {
+
+    /**
+     * Optional component-registered view fragments. Empty when no optional component is
+     * active, so the shipped pages render exactly the same markup.
+     */
+    private final List<PageExtension> pageExtensions;
+
+    public GlobalModelAdvice(ObjectProvider<PageExtension> pageExtensions) {
+        this.pageExtensions = pageExtensions.orderedStream().toList();
+    }
+
+    /** Fragments that optional components want included on a given page slot. */
+    @ModelAttribute("pageExtensions")
+    public List<PageExtension> pageExtensions() {
+        return pageExtensions;
+    }
 
     /**
      * Language tag for the {@code <html lang>} attribute: "en" or "zh-HK". Only these two

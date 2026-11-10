@@ -67,12 +67,29 @@ Rough running cost: a small VPS is usually US$5–10/month (a Raspberry Pi at ho
 
 | File | What it does |
 | --- | --- |
-| `Dockerfile` | Builds the WAR inside Docker, then puts it in a small Java runtime image. Runs as a non-root user and includes a healthcheck. |
-| `compose.yaml` | Runs the app with a persistent volume; optionally runs `cloudflared` with the `tunnel` profile. Binds the local app port to `127.0.0.1` only. |
-| `.env.example` | Copy to `.env` and paste the Cloudflare Tunnel token into it. |
-| `scripts/backup.sh` | Makes a consistent `sqlite3 .backup` while the app is running. |
-| `scripts/restore.sh` | Replaces the live database with a backup, after asking you to type `yes`. |
+| `Dockerfile` | Builds the WAR inside Docker, then puts it in a small Java runtime image. Runs as a non-root user (UID 10001), keeps `/data` mode 0700, and includes a healthcheck. Base-image updates arrive as Dependabot pull requests. |
+| `compose.yaml` | Runs the app with a persistent volume and hardened runtime (`cap_drop: ALL`, pids limits, `no-new-privileges`); optionally runs `cloudflared` with the `tunnel` profile. Binds the local app port to `127.0.0.1` only. |
+| `compose.companion.yaml` | Optional overlay for the AI companion (oiep-backendAI). Adds the companion service and wires `OIEP_COMPANION_*` into the app; the base `compose.yaml` stays in charge of the OIEP container. Off unless you use the overlay explicitly. |
+| `.env.example` | Copy to `.env` and paste the Cloudflare Tunnel token into it. The admin password is empty in the example, so the admin area starts disabled until you fill it in. The optional AI companion block is commented out and off by default. |
+| `scripts/backup.sh` | Makes a consistent `sqlite3 .backup` while the app is running; removes its temporary in-volume copy on any failure and writes the backup with mode 0600. |
+| `scripts/restore.sh` | Replaces the live database with a backup after asking you to type `yes`; validates the file name, checks the SQLite header and swaps the file into place only after a successful copy. |
+| `scripts/companion-uninstall.sql` | Optional AI companion removal step: drops the read-API's SQLite triggers/table. Only needed if you enabled the companion and are removing it again. |
 | `docs/DEPLOY.md` | This file. |
+| `docs/COMPANION.md` | Optional AI companion reference: what it adds, configuration, tokens, read API, privacy and the add/remove procedure. |
+
+### Optional AI companion (oiep-backendAI)
+
+OIEP can optionally be paired with [oiep-backendAI](https://github.com/Coffet/oiep-backendAI), a separate local-first AI helper service. This is **off by default** and the base `compose.yaml` never starts it.
+
+If you want it, read **[docs/COMPANION.md](COMPANION.md)** first: it covers the trust model, the two token pairs, the privacy obligations and the exact add/remove procedure. Then use the optional overlay alongside the base file:
+
+```bash
+docker compose -f compose.yaml -f compose.companion.yaml up -d --build
+```
+
+The overlay builds the companion from a sibling `../oiep-backendAI` checkout (or an `OIEP_AI_IMAGE`), publishes it on `127.0.0.1` only, and wires the `OIEP_COMPANION_*` variables into the existing app container. It does **not** expose the companion publicly: if you enable the user-helper widget, route a public hostname to `ai:8090` through the tunnel and block the companion's `/v1/admin/` path there, as described in `docs/COMPANION.md` and the companion's own `docs/SECURITY.md`. The admin helper page (`/admin/assistant`) works entirely over the private Docker network and needs no public companion hostname.
+
+To remove it again, follow the full-removal procedure in [docs/COMPANION.md](COMPANION.md) — run `scripts/companion-uninstall.sql` **before** deleting the component code, because the read API's database triggers otherwise make deletes on `reports` fail.
 
 ---
 
@@ -104,6 +121,8 @@ notepad .env
 ```
 
 Set `OIEP_ADMIN_PASSWORD` to a long random value, save, and run `docker compose up -d --build` again. The default username is `admin`; change `OIEP_ADMIN_USERNAME` too if you prefer.
+
+> The Docker Compose deployment marks the session cookie `Secure` (`OIEP_SESSION_COOKIE_SECURE=true`) because production is HTTPS. Browsers refuse to send a `Secure` cookie over plain `http://`, so for local admin testing at `http://127.0.0.1:8080` add `OIEP_SESSION_COOKIE_SECURE=false` to `.env`. That is for local Docker only — never on the public site.
 
 Useful local commands:
 
@@ -220,10 +239,16 @@ Set the admin credentials too:
 
 ```dotenv
 OIEP_ADMIN_USERNAME=admin
-OIEP_ADMIN_PASSWORD=PASTE_A_LONG_RANDOM_PASSWORD_HERE
+OIEP_ADMIN_PASSWORD=<paste-your-own-long-random-secret>
 ```
 
+Replace the password value with a real secret from your password manager (the placeholders used in this repository are rejected at startup, fail-closed).
+
 Use a password manager to generate at least 16 random characters. The admin area stays disabled if this value is empty. Do not reuse your tunnel token or SSH password.
+
+A password copied verbatim from this repository (the placeholder examples in the README, this guide or `.env.example`, including `<paste-your-own-long-random-secret>`) is detected at startup and the admin area stays **disabled** — fail-closed — so a forgotten placeholder can never become a working password. If the app log says the admin area is disabled after you set a password, that password was empty or one of the documented placeholders.
+
+Leave the other security defaults alone: `OIEP_TRUST_CLOUDFLARE_CONNECTING_IP=true` makes the app read the real visitor IP from Cloudflare's `CF-Connecting-IP` header (client-supplied `X-Forwarded-For` is never trusted), `OIEP_SESSION_COOKIE_SECURE=true` marks the session cookie Secure over HTTPS, and `OIEP_SESSIONS_MAX_ACTIVE` caps concurrent server-side sessions. `compose.yaml` sets them; change them only if you are not using Cloudflare Tunnel.
 
 If port 8080 on the server is already used by something else, add:
 
@@ -341,6 +366,16 @@ docker compose logs -f --tail=100 cloudflared
 docker compose restart app
 ```
 
+### Security events in the log
+
+Failed and throttled admin sign-ins, sign-outs and every moderation action (hide/restore/delete) are written to the app log with the resolved client address. Look for them with:
+
+```bash
+docker compose logs app | grep -Ei 'sign-in|sign-out|Moderation|throttled|Refusing to allocate'
+```
+
+Logs use Docker's local `json-file` driver (rotated at 10 MB x 3 in `compose.yaml`) and are not shipped anywhere by default. If you need retention or alerting, forward the app log to an external system (for example a small vector/syslog container pointed at your logging service).
+
 ### Stop the site without deleting data
 
 ```bash
@@ -399,7 +434,7 @@ It writes something like:
 backups/oiep-20261109T155636Z.db
 ```
 
-The script uses SQLite's `.backup` command, so it is safe while people are using the site.
+The script uses SQLite's `.backup` command, so it is safe while people are using the site. Backups contain every submitted note (including moderation-hidden ones), so the script writes them with mode `0600` and always removes its temporary copy inside the volume — on success and on failure.
 
 ### Download the backup to your computer
 
@@ -430,11 +465,11 @@ cd /opt/oiep
 sh scripts/restore.sh backups/oiep-20261109T155636Z.db
 ```
 
-It asks you to type `yes`. After that it stops the app, replaces the database in the volume, restarts the app, and prints the log command. Check the site.
+It asks you to type `yes`. After that it stops the app, copies the backup into the volume under a temporary name, sets ownership to UID/GID 10001 and mode `0600`, and only then swaps it in and restarts the app. The script also rejects any file name that is not made of letters, digits, `.`, `_` and `-`, and refuses a file that does not start with the SQLite header, so a mistyped or malicious path cannot become a shell command or replace the database with the wrong file. If a step fails, the previous database is left untouched and the app stays stopped (the error message tells you how to start it). Check the site afterwards.
 
 ### Windows local Docker
 
-The backup/restore scripts are written for a Linux server. On Windows, use **Git Bash** or **WSL** to run them, or use Docker Desktop and the manual commands in the script. For production, use the Linux VPS — that is what the guide is for.
+The backup/restore scripts are written for a Linux server. On Windows, use **Git Bash** or **WSL** to run them, or use Docker Desktop and the manual commands in the script. On a Windows filesystem (`/mnt/c` in WSL or Git Bash) the `chmod 600` in the script may be emulated by the filesystem and the backup can inherit Windows ACLs instead — check the file's permissions or copy it to an encrypted location; on the Linux VPS the mode is enforced. For production, use the Linux VPS — that is what the guide is for.
 
 ---
 
@@ -504,9 +539,19 @@ Compose reads `.env` when it creates/recreates containers. Re-run:
 docker compose --profile tunnel up -d --force-recreate
 ```
 
-### The rate limit blocks everyone at once
+### Rate limits, visitor IPs and forwarded headers
 
-This happens when the app sees every visitor as the proxy's IP. The compose file already enables `SERVER_FORWARD_HEADERS_STRATEGY=framework` and binds the app to loopback only, so Cloudflare Tunnel's forwarded client IP is used. Do not remove those settings unless you know what you are doing.
+The compose deployment binds the app port to `127.0.0.1`, and only `cloudflared` can reach it. The app uses `server.forward-headers-strategy=native`: Tomcat's `RemoteIpValve` accepts the real visitor address from Cloudflare's `CF-Connecting-IP` header only when the immediate peer is the trusted tunnel hop (`OIEP_TRUST_CLOUDFLARE_CONNECTING_IP=true`). Client-supplied `X-Forwarded-For` / `Forwarded` headers are never used for rate limits or logs, so rotating them cannot bypass a throttle.
+
+Do **not** replace this with `SERVER_FORWARD_HEADERS_STRATEGY=framework`: that Spring strategy trusts the client-controllable `X-Forwarded-For` header, which would let anyone bypass the per-client limits and the admin login throttle. If you front the site with a different proxy (Nginx, Caddy, another CDN), configure that proxy's trusted hop for Tomcat (or keep the app reachable only through Cloudflare) — never trust client-supplied forwarding headers on an internet-facing instance.
+
+### "Admin sign-in is throttled" or the admin page is locked out
+
+The admin login throttle is per resolved client address: 6 sign-in attempts per 15 minutes (successful sign-ins count toward the budget too), then a fail-closed lockout for the rest of the window (HTTP 429). The counter lives in memory, so restarting the app container clears it (`docker compose restart app`). A shared egress IP — an office NAT or the admin's own VPN — can hit the limit for everyone behind it; that is deliberate (fail closed) and is the cost of online guessing protection. Double-check you are using the real password and not a documented placeholder (the admin area stays disabled for those).
+
+### Admin login fails over plain HTTP in local Docker
+
+The Compose deployment sets `OIEP_SESSION_COOKIE_SECURE=true` for the production HTTPS setup. A browser will not send a `Secure` cookie over `http://`, so the admin login page cannot keep its session locally. For local testing only, add `OIEP_SESSION_COOKIE_SECURE=false` to `.env` and run `docker compose up -d --force-recreate`. Never set it to `false` on the public HTTPS site.
 
 ### Data disappeared
 
@@ -539,16 +584,19 @@ You connected the repo to Pages. Delete that Pages project. Use the Docker + Tun
 
 ## 11. Security and upkeep checklist
 
-- [ ] Never commit `.env`. It contains your tunnel token and admin password.
-- [ ] Use a long, unique `OIEP_ADMIN_PASSWORD`; the admin area is disabled while it is empty.
-- [ ] Keep the app port bound to `127.0.0.1`; do not change it to `0.0.0.0` unless you deliberately put a trusted reverse proxy in front.
-- [ ] Keep `SERVER_FORWARD_HEADERS_STRATEGY=framework` only because the app is behind Cloudflare Tunnel and the port is loopback-only.
+- [ ] Never commit `.env`. It contains your tunnel token and admin password. Keep it `chmod 600`.
+- [ ] Use a long, unique `OIEP_ADMIN_PASSWORD` (16+ random characters from a password manager). The admin area is disabled while it is empty, and repository-documented placeholders are rejected fail-closed. The single admin account has no MFA.
+- [ ] Keep the app port bound to `127.0.0.1`; do not change it to `0.0.0.0`.
+- [ ] Keep the shipped security defaults: `OIEP_TRUST_CLOUDFLARE_CONNECTING_IP=true` reads the real visitor IP from `CF-Connecting-IP` (never trust client `X-Forwarded-For`), `OIEP_SESSION_COOKIE_SECURE=true`, and the session cap. Keep `OIEP_TRUST_CLOUDFLARE_CONNECTING_IP=true` **only while the app port stays loopback-bound behind Cloudflare Tunnel**: the app honours `CF-Connecting-IP` only because Tomcat's trusted-proxy handling has already rewritten the peer address to that value; on a directly exposed instance, leave it `false`. Do not switch to `server.forward-headers-strategy=framework`.
+- [ ] Turn on **SSL/TLS → Edge Certificates → Always Use HTTPS** in Cloudflare for the public hostname, so visitors cannot start over plain HTTP. The app sends HSTS only when a request reached it over HTTPS.
 - [ ] Keep demo data off on a real site: `OIEP_DEMO_DATA=false` (the default).
-- [ ] Run `apt upgrade` and Docker updates regularly.
-- [ ] Keep backups off the server.
-- [ ] Test a restore before you need it.
-- [ ] Do not run more than one app container against the same SQLite file. SQLite + this app is designed for one small instance.
-- [ ] If you later put the site behind a different proxy (Nginx, Caddy), revisit forwarded headers and the rate limiter.
+- [ ] Ship the app log off the host, or at least alert on the `sign-in`/`Moderation` lines; structured security events exist but are local stdout only by default.
+- [ ] Run `apt upgrade` and apply the Dependabot update PRs (Maven, GitHub Actions, Docker base images). CI's Docker smoke test re-checks the security headers, relative admin redirect and session-cookie flags on every pull request.
+- [ ] Keep backups off the server. They contain all notes (including hidden ones): the script writes them `0600`; keep it that way and/or encrypt them.
+- [ ] Test a restore before you need it (the script validates the file and swaps it in safely).
+- [ ] Do not run more than one app container against the same SQLite file. SQLite + this app is designed for one small instance; the rate limiters, login throttle and session cap are per-instance and reset on restart.
+- [ ] If you later put the site behind a different proxy (Nginx, Caddy), configure that proxy's trusted hop explicitly (see "Rate limits, visitor IPs and forwarded headers").
+- [ ] Accept and understand the residual risks: helpful votes are per browser session (throttled per client), the fail-closed login throttle can lock out a shared egress IP, there is no MFA on the single admin account, and the app-level limits are abuse friction rather than a WAF.
 
 ---
 
@@ -565,6 +613,9 @@ docker compose ps
 # Logs
 docker compose logs -f --tail=100 app
 docker compose logs -f --tail=100 cloudflared
+
+# Security events (failed/throttled sign-ins, moderation actions)
+docker compose logs app | grep -Ei 'sign-in|sign-out|Moderation|throttled'
 
 # Restart the app only
 docker compose restart app
@@ -587,9 +638,11 @@ https://oiep.YOURDOMAIN.com
 ## 13. What was verified for this repository
 
 - `docker compose build app` succeeds.
-- `docker compose up -d app` starts the app as UID 10001, healthcheck reports `healthy`, and the site returns HTTP 200.
+- `docker compose up -d app` starts the app as UID 10001, the healthcheck reports `healthy`, and the site returns HTTP 200.
+- `docker compose config` validates the hardened compose file (capabilities dropped, pids limits, the security environment defaults).
 - The `oiep-data` volume persists reports across `docker compose restart`.
-- `scripts/backup.sh` produces a valid SQLite backup; `scripts/restore.sh` restores it and the app comes back healthy.
+- `scripts/backup.sh` produces a valid SQLite backup (mode `0600`, temporary in-volume copy always removed); `scripts/restore.sh` validates and restores it and the app comes back healthy. The guard rails (file-name validation, SQLite header check, copy-then-swap into a scratch volume) were tested against a scratch volume, not the live production one.
+- CI (`.github/workflows/ci.yml`) builds the image and smoke-tests the patched build: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`, CSP SHA-256 hashes with **no** `'unsafe-inline'`, a relative `Location: /admin/login` redirect, and `Secure`/`HttpOnly`/`SameSite=Lax` on the session cookie.
 - The same app container was reached through a temporary Cloudflare quick tunnel and returned the OIEP page with `Server: cloudflare` and a real `CF-RAY` header. The permanent named-tunnel setup in this guide uses the same `cloudflared` image and `TUNNEL_TOKEN` mechanism; you complete the named tunnel in your own Cloudflare account.
 
-The permanent public hostname cannot be tested without your Cloudflare account and domain. Everything on the server and tunnel container side is included and tested.
+The permanent public hostname cannot be tested without your Cloudflare account and domain. Everything on the server and tunnel container side is included and tested locally; the app-level controls are abuse friction, not a substitute for Cloudflare's edge protection.

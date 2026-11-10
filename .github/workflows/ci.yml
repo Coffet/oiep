@@ -81,7 +81,18 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Start container
-        run: docker run -d --name oiep-ci -p 18080:8080 oiep:ci
+        run: |
+          # The app applies the Secure session-cookie attribute from configuration
+          # (OIEP_SESSION_COOKIE_SECURE), independent of the scheme this smoke test uses over
+          # plain HTTP; the production opt-in is enabled explicitly and a throw-away admin
+          # password makes the login page allocate a session (and therefore a Set-Cookie
+          # header).
+          docker run -d --name oiep-ci \
+            -p 18080:8080 \
+            -e OIEP_SESSION_COOKIE_SECURE=true \
+            -e OIEP_ADMIN_USERNAME=ci-admin \
+            -e OIEP_ADMIN_PASSWORD=ci-smoke-test-only-9f3a2b1c \
+            oiep:ci
 
       - name: Wait for the public page
         run: |
@@ -96,12 +107,42 @@ jobs:
           docker logs oiep-ci
           exit 1
 
-      - name: Check baseline headers and admin redirect
+      - name: Check security headers, relative admin redirect and session cookie
         run: |
-          curl -sS -o /dev/null -D response-headers.txt http://127.0.0.1:18080/
-          grep -qi '^x-content-type-options: nosniff' response-headers.txt
-          status=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/admin)
-          test "$status" = "302"
+          set -eu
+          base=http://127.0.0.1:18080
+
+          # Dynamic HTML: baseline headers, CSP with per-inline SHA-256 hashes and no
+          # 'unsafe-inline', and cross-origin isolation headers.
+          curl -sS -o /dev/null -D page-headers.txt "$base/"
+          grep -qi '^x-content-type-options: nosniff' page-headers.txt
+          grep -qi '^x-frame-options: DENY' page-headers.txt
+          grep -qi '^cross-origin-opener-policy: same-origin' page-headers.txt
+          grep -qi '^content-security-policy: .*sha256-' page-headers.txt
+          if grep -qi 'unsafe-inline' page-headers.txt; then
+            echo "Content-Security-Policy still contains 'unsafe-inline'" >&2
+            exit 1
+          fi
+
+          # /admin must redirect with a relative Location, so a forged Host /
+          # X-Forwarded-Host header can never turn the redirect into a cross-host one.
+          admin_status=$(curl -sS -o /dev/null -D admin-headers.txt -w '%{http_code}' "$base/admin")
+          test "$admin_status" = "302"
+          grep -qi '^location: /admin/login' admin-headers.txt
+          if grep -qiE '^location: https?://' admin-headers.txt; then
+            echo "Admin redirect uses an absolute URL; expected a relative Location" >&2
+            exit 1
+          fi
+
+          # Session cookie must carry Secure + HttpOnly + SameSite=Lax.
+          login_status=$(curl -sS -o /dev/null -D login-headers.txt -w '%{http_code}' "$base/admin/login")
+          test "$login_status" = "200"
+          grep -qi '^set-cookie: JSESSIONID=' login-headers.txt
+          grep -qi '^set-cookie: JSESSIONID=.*Secure' login-headers.txt
+          grep -qi '^set-cookie: JSESSIONID=.*HttpOnly' login-headers.txt
+          grep -qi '^set-cookie: JSESSIONID=.*SameSite=Lax' login-headers.txt
+
+          echo "Security header, redirect and cookie assertions passed."
 
       - name: Show container logs
         if: always()

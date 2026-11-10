@@ -252,14 +252,24 @@ public class ReportRepository {
         report.setId(resultSet.getLong("id"));
         report.setCompany(resultSet.getString("company"));
         report.setRole(resultSet.getString("role"));
-        report.setRound(resultSet.getString("round"));
-        report.setWorkMode(resultSet.getString("work_mode"));
+        // Allowed-value columns are re-validated on read: the database file is an external
+        // boundary (restore, direct edit, import), and the JSPs build message codes from these
+        // values. Unknown values fall back to safe existing options so a crafted row can never
+        // break message lookup or act as a message-code injection vector.
+        report.setRound(ReportOptions.sanitizeStoredOption(
+                resultSet.getString("round"), ReportOptions.ROUNDS, "other"));
+        report.setWorkMode(ReportOptions.sanitizeStoredOption(
+                resultSet.getString("work_mode"), ReportOptions.WORK_MODES, ""));
         report.setLocation(resultSet.getString("location"));
-        report.setOutcome(resultSet.getString("outcome"));
-        report.setHeardBack(resultSet.getString("heard_back"));
-        report.setQuestionTypes(splitQuestionTypes(resultSet.getString("question_types")));
+        report.setOutcome(ReportOptions.sanitizeStoredOption(
+                resultSet.getString("outcome"), ReportOptions.OUTCOMES, "waiting"));
+        report.setHeardBack(ReportOptions.sanitizeStoredOption(
+                resultSet.getString("heard_back"), ReportOptions.HEARD_BACK, ""));
+        report.setQuestionTypes(ReportOptions.sanitizeQuestionTypes(
+                splitQuestionTypes(resultSet.getString("question_types"))));
         report.setSalary(resultSet.getString("salary"));
-        report.setVibe(resultSet.getString("vibe"));
+        report.setVibe(ReportOptions.sanitizeStoredOption(
+                resultSet.getString("vibe"), ReportOptions.VIBES, ""));
         report.setStory(resultSet.getString("story"));
         report.setHelpful(resultSet.getInt("helpful"));
         report.setCreatedAt(resultSet.getString("created_at"));

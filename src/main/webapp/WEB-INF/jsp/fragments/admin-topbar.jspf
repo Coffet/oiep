@@ -20,6 +20,10 @@
       <c:when test="${adminAuthenticated}">
         <a class="topbar__browse" href="${ctx}/admin"<c:if test="${activeNav eq 'admin'}"> aria-current="page"</c:if>><spring:message code="admin.nav.dashboard"/></a>
         <a class="topbar__browse" href="${ctx}/"><spring:message code="admin.nav.site"/></a>
+        <%-- Optional component slot: extra operator links render only when a component is active. --%>
+        <c:forEach items="${pageExtensions}" var="extension">
+          <c:if test="${extension.page eq 'admin-nav'}"><jsp:include page="${extension.fragment}"/></c:if>
+        </c:forEach>
         <form class="admin-logout" action="${ctx}/admin/logout" method="post">
           <input type="hidden" name="_csrf" value="<c:out value='${adminCsrfToken}'/>">
           <button class="topbar__browse admin-logout__button" type="submit"><spring:message code="admin.logout"/></button>

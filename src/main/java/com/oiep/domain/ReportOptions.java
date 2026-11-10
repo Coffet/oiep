@@ -113,4 +113,21 @@ public final class ReportOptions {
     public static String trimToEmpty(String value) {
         return value == null ? "" : value.trim();
     }
+
+    /**
+     * Defensive normalisation for an allowed-value column read back from the database.
+     *
+     * <p>Rows written through the application are already validated, but the database file is
+     * an external boundary (backups, restores, direct edits, a future import tool). Views build
+     * message codes from these columns, so an unknown value would either fail message lookup
+     * or render attacker-controlled text as a code. Unknown values are therefore mapped to a
+     * safe fallback on read; known values are normalised to their canonical lowercase form.</p>
+     */
+    public static String sanitizeStoredOption(String rawValue, List<String> allowedValues, String fallback) {
+        if (rawValue == null || allowedValues == null) {
+            return fallback == null ? "" : fallback;
+        }
+        String candidate = rawValue.trim().toLowerCase(Locale.ROOT);
+        return allowedValues.contains(candidate) ? candidate : (fallback == null ? "" : fallback);
+    }
 }

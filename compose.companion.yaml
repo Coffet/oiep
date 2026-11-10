@@ -1,0 +1,162 @@
+# OIEP — optional Docker Compose overlay for the AI companion (oiep-backendAI).
+#
+# The base compose.yaml is intentionally untouched. This file only:
+#   1. adds an `ai` service (the companion), and
+#   2. adds the OIEP_COMPANION_* environment variables to the existing `app` service.
+#
+# Use it together with the base file:
+#
+#   docker compose -f compose.yaml -f compose.companion.yaml up -d --build
+#   docker compose -f compose.yaml -f compose.companion.yaml ps
+#   docker compose -f compose.yaml -f compose.companion.yaml logs -f ai
+#
+# Full reference: docs/COMPANION.md. Remove the overlay again with:
+#   docker compose -f compose.yaml up -d --force-recreate   # after deleting this file
+#
+# Requirements, in order of importance:
+#   * A sibling checkout of https://github.com/Coffet/oiep-backendAI at
+#     ../oiep-backendAI (default below), or a prebuilt image via OIEP_AI_IMAGE.
+#   * .env (copy .env.example): OIEP_COMPANION_ADMIN_TOKEN, OIEP_COMPANION_READ_TOKEN
+#     and OIEP_AI_IP_HASH_SALT must be real secrets; with OIEP_AI_ENV=prod the
+#     companion refuses to start with weak/missing ones.
+#   * The user-helper widget is loaded by the visitor's BROWSER, so it needs a
+#     browser-reachable public URL (OIEP_COMPANION_WIDGET_URL). "http://ai:8090"
+#     is only the internal server-side address and cannot be used for the iframe.
+#     The overlay therefore defaults OIEP_COMPANION_USER_HELPER_ENABLED to false;
+#     set it to true together with a public widget URL.
+#   * The companion's /v1/admin/ must stay blocked at any public proxy. The admin
+#     helper reaches it server-side over the private Compose network, so no
+#     public exposure of /v1/admin/ is needed.
+#   * OIEP_AI_ENV=prod requires https:// for OIEP_AI_OIEP_BASE_URL, so corpus sync
+#     points at the public HTTPS OIEP URL, not at http://app:8080.
+#
+# Both services read the same .env. The two token pairs are mapped explicitly so
+# each secret is set once:
+#   app OIEP_COMPANION_ADMIN_TOKEN  ==  ai OIEP_AI_ADMIN_TOKEN
+#   app OIEP_COMPANION_READ_TOKEN   ==  ai OIEP_AI_OIEP_SYNC_TOKEN
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # OIEP application: add the optional component's configuration.
+  # Base environment (OIEP_DB_PATH, admin credentials, Cloudflare settings) and
+  # the hardened runtime settings stay exactly as in compose.yaml.
+  # ---------------------------------------------------------------------------
+  app:
+    environment:
+      # Master switch. The overlay enables the component; set
+      # OIEP_COMPANION_ENABLED=false in .env to soft-disable it while leaving the
+      # containers running (no routes, page fragments or CSP changes).
+      OIEP_COMPANION_ENABLED: ${OIEP_COMPANION_ENABLED:-true}
+      # Server-side companion origin: the internal Compose DNS name. Never put a
+      # public URL here — the admin proxy must not cross the public proxy.
+      OIEP_COMPANION_BASE_URL: ${OIEP_COMPANION_BASE_URL:-http://ai:8090}
+
+      # User helper (public form page). Off by default in Docker because the
+      # iframe needs a public widget URL; see the note at the top of this file.
+      OIEP_COMPANION_USER_HELPER_ENABLED: ${OIEP_COMPANION_USER_HELPER_ENABLED:-false}
+      OIEP_COMPANION_WIDGET_URL: ${OIEP_COMPANION_WIDGET_URL:-}
+
+      # Operator admin helper at /admin/assistant. Enabled by default; without a
+      # usable OIEP_COMPANION_ADMIN_TOKEN it fails closed (no page, no routes).
+      OIEP_COMPANION_ADMIN_HELPER_ENABLED: ${OIEP_COMPANION_ADMIN_HELPER_ENABLED:-true}
+      OIEP_COMPANION_ADMIN_TOKEN: ${OIEP_COMPANION_ADMIN_TOKEN:-}
+
+      # Read-only experiences API used by the companion's corpus sync. Harmless
+      # without a usable token: the endpoint is then not registered at all.
+      OIEP_COMPANION_READ_API_ENABLED: ${OIEP_COMPANION_READ_API_ENABLED:-true}
+      OIEP_COMPANION_READ_TOKEN: ${OIEP_COMPANION_READ_TOKEN:-}
+      OIEP_COMPANION_READ_PAGE_SIZE: ${OIEP_COMPANION_READ_PAGE_SIZE:-200}
+      OIEP_COMPANION_READ_DIFFICULTY: ${OIEP_COMPANION_READ_DIFFICULTY:-MODERATE}
+      OIEP_COMPANION_READ_DIFFICULTY_MODE: ${OIEP_COMPANION_READ_DIFFICULTY_MODE:-constant}
+
+      # Server-side admin proxy timeouts (milliseconds).
+      OIEP_COMPANION_CONNECT_TIMEOUT_MS: ${OIEP_COMPANION_CONNECT_TIMEOUT_MS:-3000}
+      OIEP_COMPANION_REQUEST_TIMEOUT_MS: ${OIEP_COMPANION_REQUEST_TIMEOUT_MS:-15000}
+
+  # ---------------------------------------------------------------------------
+  # oiep-backendAI companion service.
+  # Bridge networking (not the companion's host-network default) so the process
+  # runs in the same private network as `app`; the image is hardened the same
+  # way as the app container. The companion port is published on loopback only,
+  # for operator curl/SSH tunnels — it is never bound to 0.0.0.0.
+  # ---------------------------------------------------------------------------
+  ai:
+    build:
+      # Sibling checkout of the companion repository; override when it lives
+      # elsewhere (relative to this directory) or use OIEP_AI_IMAGE.
+      context: ${OIEP_AI_BUILD_CONTEXT:-../oiep-backendAI}
+      dockerfile: deploy/docker/Dockerfile
+    image: ${OIEP_AI_IMAGE:-oiep-backendai:1.0.0}
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    # The companion needs ordinary file and network access only, never capabilities.
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    # Only the mounted /data volume is writable.
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    environment:
+      TZ: ${TZ:-Asia/Hong_Kong}
+      # prod fails closed on weak admin token / missing IP salt / non-HTTPS URLs.
+      OIEP_AI_ENV: ${OIEP_AI_ENV:-prod}
+      # Bridge networking: bind inside the container; the published port below
+      # and the `app` service both reach it over the private network.
+      OIEP_AI_HOST: 0.0.0.0
+      OIEP_AI_PORT: "8090"
+      OIEP_AI_PUBLIC_BASE_URL: ${OIEP_AI_PUBLIC_BASE_URL:-}
+      OIEP_AI_DATA_DIR: /data
+      OIEP_AI_DB_PATH: /data/oiep-ai.sqlite3
+
+      # Token pair 1: companion operator API == OIEP admin helper token.
+      OIEP_AI_ADMIN_TOKEN: ${OIEP_COMPANION_ADMIN_TOKEN:-}
+      OIEP_AI_IP_HASH_SALT: ${OIEP_AI_IP_HASH_SALT:-}
+      OIEP_AI_ADMIN_IP_ALLOWLIST: ${OIEP_AI_ADMIN_IP_ALLOWLIST:-}
+      OIEP_AI_CORS_ORIGINS: ${OIEP_AI_CORS_ORIGINS:-}
+
+      # Corpus sync (optional): pull published experiences from OIEP's read API.
+      # Token pair 2: companion sync token == OIEP read-API token.
+      OIEP_AI_OIEP_BASE_URL: ${OIEP_AI_OIEP_BASE_URL:-}
+      OIEP_AI_OIEP_SYNC_TOKEN: ${OIEP_COMPANION_READ_TOKEN:-}
+      OIEP_AI_OIEP_EXPERIENCES_PATH: ${OIEP_AI_OIEP_EXPERIENCES_PATH:-/api/v1/experiences}
+      OIEP_AI_SYNC_ENABLED: ${OIEP_AI_SYNC_ENABLED:-false}
+      OIEP_AI_SYNC_INTERVAL_SECONDS: ${OIEP_AI_SYNC_INTERVAL_SECONDS:-900}
+
+      # Default backend is fully local/deterministic; no model weights in the image.
+      OIEP_AI_MODEL_BACKEND: ${OIEP_AI_MODEL_BACKEND:-extractive}
+      OIEP_AI_IMPROVEMENT_ENABLED: ${OIEP_AI_IMPROVEMENT_ENABLED:-true}
+
+      # Behind the Cloudflare Tunnel, requests reach the companion from the
+      # cloudflared container on the Compose network. Trusting the private
+      # Docker ranges lets the service read the real visitor address from
+      # X-Forwarded-For for per-IP rate limits and hashed-IP audit rows; with the
+      # companion's stock default (127.0.0.1 only) every visitor would appear to
+      # come from the tunnel container. Narrow this to your exact Compose network
+      # CIDR if you know it.
+      OIEP_AI_TRUSTED_PROXIES: ${OIEP_AI_TRUSTED_PROXIES:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16,127.0.0.1/32,::1/128}
+    volumes:
+      # Companion SQLite database (sessions, corpus mirror, audit, receipts).
+      # Back it up with the companion's documented sqlite3 .backup procedure.
+      - oiep-ai-data:/data
+    ports:
+      # Operator-only local access (curl, SSH tunnel to /v1/admin/). Loopback
+      # bind only; do not change to 0.0.0.0. Public widget traffic, if enabled,
+      # goes through the Cloudflare Tunnel to `ai:8090` on the private network.
+      - "127.0.0.1:${OIEP_AI_PUBLISH_PORT:-8090}:8090"
+    # The companion image ships its own HEALTHCHECK on GET /healthz (see its
+    # deploy/docker/Dockerfile); `docker compose ps` shows it as healthy/unhealthy.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  oiep-ai-data:
+    # Fixed name so backups/operator commands can find it regardless of the
+    # directory name you cloned into.
+    name: oiep-ai-data

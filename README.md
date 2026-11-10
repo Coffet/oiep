@@ -38,9 +38,9 @@ The first working slice:
 - **Report detail** — published note, metadata, anonymous signoff, and a useful vote (once per browser session).
 - **Bilingual UI** — English first, human-written standard written Traditional Chinese (`zh-HK`) available through the header toggle. Persisted in an `OIEP_LANG` cookie.
 - **About** — the full “why this exists”, roadmap and tech-stack copy lives on `/about`, keeping the index focused on the form.
-- **Admin / moderation** — password-protected `/admin` dashboard with note counts, search and status filters, hide/restore, delete-with-confirmation, CSRF tokens, login throttling, session rotation and no-store admin responses.
-- **Ops basics** — SQLite out of the box, custom 404/500 pages, XSS-safe JSP output escaping, baseline security headers, honeypot, per-IP rate limiting, cookie-only sessions.
-- **Deployment** — multi-stage Docker image, persistent SQLite volume, Cloudflare Tunnel service, backup/restore scripts, and a beginner-friendly guide at [docs/DEPLOY.md](docs/DEPLOY.md).
+- **Admin / moderation** — password-protected `/admin` dashboard with note counts, search and status filters, hide/restore, delete-with-confirmation, per-session CSRF tokens, login throttling plus a login-page throttle, session rotation, a hard server-side session cap and no-store admin responses. Failed sign-ins, throttling and moderation actions are written to the security log with the resolved client address.
+- **Ops basics** — SQLite out of the box, custom 404/500 pages, XSS-safe JSP output escaping, hash-based CSP with HSTS-on-HTTPS/COOP/CORP/X-Frame-Options, honeypot, per-client rate limiting keyed on the real visitor IP (Cloudflare `CF-Connecting-IP`; client-supplied `X-Forwarded-For` is never trusted), same-origin checks on anonymous POSTs, and cookie-only sessions with `Secure`/`HttpOnly`/`SameSite=Lax`.
+- **Deployment** — multi-stage Docker image, hardened Compose runtime (`cap_drop: ALL`, pids limits, no-new-privileges), persistent SQLite volume, Cloudflare Tunnel service, safe backup/restore scripts, Dependabot updates and a CI Docker smoke test that asserts the security headers, relative admin redirect and session-cookie flags.
 
 ## Run it
 
@@ -88,19 +88,20 @@ The seeder only runs when the reports table is empty, and the company names are 
 
 ### Admin area
 
-The admin area is **disabled until you set a password**. There is deliberately no default admin password in the repository.
+The admin area is **disabled until you set a password**. There is deliberately no default admin password in the repository. Use a unique long random secret (16+ characters recommended); a placeholder copied verbatim from this repository's docs or `.env.example` is detected at startup and the admin area stays disabled, fail-closed.
 
 Set both variables before starting the app:
 
 ```powershell
 $env:OIEP_ADMIN_USERNAME = "admin"
-$env:OIEP_ADMIN_PASSWORD = "choose-a-long-random-password"
+# Replace the placeholder with your own long random secret; this exact placeholder is rejected at startup.
+$env:OIEP_ADMIN_PASSWORD = "<paste-your-own-long-random-secret>"
 java -jar target/oiep.war
 ```
 
 ```bash
 OIEP_ADMIN_USERNAME=admin \
-OIEP_ADMIN_PASSWORD='choose-a-long-random-password' \
+OIEP_ADMIN_PASSWORD='<paste-your-own-long-random-secret>' \
 java -jar target/oiep.war
 ```
 
@@ -109,6 +110,26 @@ Then open **[http://localhost:8080/admin](http://localhost:8080/admin)** directl
 [![OIEP admin dashboard](docs/admin.png)](docs/admin.png)
 
 The admin login is throttled, CSRF-protected and session-based. It only lets you hide, restore or delete notes; it never exposes the password. For Docker, put `OIEP_ADMIN_PASSWORD` in `.env` before `docker compose up -d --build`.
+
+### Optional AI companion (oiep-backendAI)
+
+A separate, optional service — [oiep-backendAI](https://github.com/Coffet/oiep-backendAI), a local-first FastAPI process — can be plugged in next to OIEP. It is **off by default**: leave `OIEP_COMPANION_ENABLED` unset (or `false`) and OIEP serves the same pages and headers as before, with no new routes, page fragments or CSP changes. (The component's static JS/CSS files stay in the built artifact and are still served while the component is disabled; nothing references them, and the full-removal procedure deletes them.)
+
+When enabled, the component adds three independent surfaces:
+
+- **User helper** — an optional chat widget on the public form page. The visitor's browser loads it directly from the companion's own origin (OIEP only adds that exact origin to the CSP `frame-src`); the widget returns a prefill payload over `postMessage` and OIEP fills the matching form fields. Nothing is submitted automatically.
+- **Read-only experiences API** — `GET /api/v1/experiences`, consumed by the companion's admin corpus sync with a dedicated read-only bearer token. Hidden/deleted notes are propagated as tombstones.
+- **Admin helper** — `/admin/assistant` inside the existing admin area, proxied server-side so the companion's operator token never reaches the browser.
+
+Enable it on bare metal with the environment variables documented in **[docs/COMPANION.md](docs/COMPANION.md)**, or run the optional Docker Compose overlay (the base `compose.yaml` is untouched):
+
+```bash
+docker compose -f compose.yaml -f compose.companion.yaml up -d --build
+```
+
+The overlay builds the companion from a sibling `../oiep-backendAI` checkout (or an `OIEP_AI_IMAGE`), publishes it on loopback only, and wires the `app` environment. Soft-disable at any time with `OIEP_COMPANION_ENABLED=false`; the exact add/remove procedure — including the `scripts/companion-uninstall.sql` database step — is in [docs/COMPANION.md](docs/COMPANION.md).
+
+> OIEP does not ask for interview difficulty or a multi-round history, so the companion's mirror carries a synthesized `difficulty` value and exactly one round entry per note. That limitation is stated plainly in the companion documentation.
 
 ### Docker (local)
 
@@ -119,6 +140,8 @@ docker compose up -d --build
 ```
 
 Open [http://127.0.0.1:8080](http://127.0.0.1:8080). The database lives in the `oiep-data` Docker volume, so `docker compose down` keeps it; `docker compose down -v` deletes it.
+
+`compose.yaml` sets `OIEP_SESSION_COOKIE_SECURE=true` because the shipped deployment is HTTPS (TLS terminates at Cloudflare), so the session cookie is marked `Secure`. For a local plain-HTTP walkthrough of the admin area add `OIEP_SESSION_COOKIE_SECURE=false` to `.env` before `docker compose up` — otherwise the browser will not send the `Secure` session cookie over `http://` and login cannot complete. Never set it to `false` on a public HTTPS deployment.
 
 ### Deploy to the internet (Docker + Cloudflare)
 
@@ -133,7 +156,7 @@ The repo includes a multi-stage `Dockerfile`, `compose.yaml` with an optional `t
 
 | Method        | Path                          | Purpose                                      |
 | ------------- | ----------------------------- | -------------------------------------------- |
-| `GET`         | `/`                           | Index: anonymous debrief form + quiet lookup |
+| `GET`         | `/`                           | Index: anonymous debrief form + quiet lookup (plus the optional AI helper when enabled) |
 | `POST`        | `/reports`                    | Validate and publish a note                  |
 | `GET`         | `/browse`                     | Search, filter and sort notes                |
 | `GET`         | `/reports/{id}`               | Read a note                                  |
@@ -147,6 +170,9 @@ The repo includes a multi-stage `Dockerfile`, `compose.yaml` with an optional `t
 | `POST`        | `/admin/reports/{id}/hide`    | Hide a note from the public board            |
 | `POST`        | `/admin/reports/{id}/restore` | Restore a hidden note                        |
 | `GET`, `POST` | `/admin/reports/{id}/delete`  | Confirmation page and permanent deletion     |
+| `GET`         | `/admin/assistant`            | Optional AI companion: operator helper page (admin session) |
+| `GET`, `POST` | `/admin/assistant/api/**`     | Optional AI companion: same-origin proxy to the companion admin API (admin session + CSRF) |
+| `GET`         | `/api/v1/experiences`         | Optional AI companion: read-only experiences API for the companion's corpus sync (bearer token) |
 
 ## Index design contract
 
@@ -171,30 +197,38 @@ Body copy is Instrument Sans at `24px`; all headings, labels and UI copy also us
 
 ## Privacy and security posture
 
-- No accounts, names or emails are collected to post or search.
+- No accounts, names or emails are collected to post or search. (A short-lived server-side session is used to hold the admin/login CSRF token and the once-per-session useful-vote marker only.)
 - The form is anonymous; the UI explicitly warns contributors not to include names or contact details.
 - All output is escaped in JSP (`c:out` / `fn:escapeXml`); SQL uses prepared statements and escaped LIKE wildcards.
-- Honeypot field + in-memory per-IP submission limit (8 posts / 10 minutes) provide basic abuse friction. If the app runs behind a trusted reverse proxy or Cloudflare, enable `server.forward-headers-strategy=framework` and configure the proxy/trust boundary — otherwise every visitor shares the proxy's single rate-limit bucket.
-- Sessions are cookie-only (no `;jsessionid` in URLs) and only created when a note is posted or a useful vote is cast. A missing report ID does not allocate a session.
-- Admin credentials are deployment environment variables, compared in constant time. Successful login rotates the session; admin mutations are POST-only and require a per-session CSRF token; login attempts are throttled per IP; admin responses are `no-store`.
+- Abuse friction: a honeypot field plus in-memory per-client limits — 8 submissions / 10 minutes and 30 useful votes / hour — keyed on the resolved client address. Anonymous `POST`s are also checked for same-origin browser provenance (`Origin`, else `Sec-Fetch-Site`, else `Referer`); non-browser clients that send none of those headers are allowed (the endpoints are anonymous and carry no ambient browser credentials).
+- Client address: behind the shipped Cloudflare Tunnel the real visitor IP arrives in `CF-Connecting-IP` (`OIEP_TRUST_CLOUDFLARE_CONNECTING_IP=true`) and Tomcat's native `RemoteIpValve` only honours it from the trusted `cloudflared` hop. Client-supplied `X-Forwarded-For` / `Forwarded` headers are never used for limits or logs, so rotating them cannot bypass a throttle. If you front the app with a different proxy, configure its trusted hop instead of trusting client headers. Keep `OIEP_TRUST_CLOUDFLARE_CONNECTING_IP` enabled only while the app port stays bound to `127.0.0.1` behind Cloudflare Tunnel; the app applies `CF-Connecting-IP` only when Tomcat's trusted-proxy handling has already rewritten the peer address to the same value.
+- Sessions are cookie-only (no `;jsessionid` in URLs). The session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when `OIEP_SESSION_COOKIE_SECURE=true` (Compose default for the HTTPS deployment). The `OIEP_LANG` locale cookie uses the same `HttpOnly`/`SameSite=Lax`/`Secure` policy, tied to the same setting. A session is allocated only for a posted note, a useful vote, or the admin login form (and not at all while admin is disabled or when CSRF validation fails). The login page is throttled per client and a hard global cap (`OIEP_SESSIONS_MAX_ACTIVE`, default 10000) bounds server-side sessions.
+- Admin credentials are deployment environment variables, compared in constant time over SHA-256 digests. Successful login rotates the session; admin mutations are POST-only and require a per-session CSRF token; the login throttle is per client and fails closed; admin responses are `no-store`. A failed sign-in, a throttled sign-in, a logout and every hide/restore/delete are logged with the resolved client address.
 - Hidden notes are excluded from the public browse/search, recent list and direct `/reports/{id}` route. Only an authenticated admin session can see or restore them.
-- Baseline response headers: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, and `Permissions-Policy`.
+- Response headers: `Content-Security-Policy` with per-inline SHA-256 hashes (no `'unsafe-inline'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin` and `X-Permitted-Cross-Domain-Policies: none`. `Strict-Transport-Security` is sent only on HTTPS responses. Dynamic HTML is `Cache-Control: no-cache` with `Vary: Cookie`, while static assets stay cacheable.
+- Redirects are emitted as relative `Location` headers, so a forged `Host`/`X-Forwarded-Host` header cannot turn an app redirect into a cross-host open redirect.
 - Custom error pages never expose stack traces or internal messages.
 
-Current limitations before a larger public launch: the anonymous submission form does not use a CSRF token (it is not tied to an authenticated session), helpful votes are per-session rather than per-person, the rate limiter is single-instance and resets on restart, and there is no audit log of moderation actions. These are documented rather than hidden.
+Current limitations before a larger public launch: useful votes are tracked per browser session (now additionally throttled per client, but still not per-person); the rate limiters, login throttle and session cap are single-instance in-memory structures that reset on restart (the app is designed for one container against one SQLite file); the login throttle fails closed, so repeated failures from a shared egress IP — including the admin's own — can lock the admin out for the 15-minute window; the single admin account has no MFA; and the app-level limiters are abuse friction, not a substitute for an external WAF (Cloudflare's edge protection is the network-level layer). The session cap admits new sessions atomically, so a concurrent burst cannot overshoot it; however a client able to hold the cap open (for example by rotating addresses) can make new sessions receive `503` until slots expire, and a successful sign-in can still be blocked by the login-page throttle for the same window. Security events go to the container's stdout log only — ship them off-host if you need retention or alerting. Docker and Cloudflare wiring are verified locally (CI smoke test plus a local Docker stack); a real named Cloudflare Tunnel needs your own account, as described in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Project structure
 
 ```
+.github/workflows/ci.yml               tests + Docker smoke with security-header/cookie assertions
+.github/dependabot.yml                 weekly Maven, GitHub Actions and Docker update PRs
 pom.xml
 mvnw, mvnw.cmd, .mvn/                  Maven wrapper
-Dockerfile                             multi-stage image, non-root runtime, healthcheck
-compose.yaml                           app + persistent volume + optional Cloudflare Tunnel
+Dockerfile                             multi-stage image, non-root runtime, healthcheck, hardened /data
+compose.yaml                           app + persistent volume + hardened runtime + optional Cloudflare Tunnel
+compose.companion.yaml                 optional AI companion Docker Compose overlay (adds the `ai` service)
 .env.example                           copy to .env for production secrets
-scripts/backup.sh, scripts/restore.sh  SQLite backup and restore helpers
+scripts/backup.sh, scripts/restore.sh  SQLite backup/restore helpers (0600 backups, guarded restore)
+scripts/companion-uninstall.sql        drops the optional companion's read-API triggers/table (removal step)
 docs/DEPLOY.md                         hand-holding deployment guide
+docs/COMPANION.md                      optional AI companion reference, config and add/remove procedure
 src/main/java/com/oiep/
-  config/                              JDBC/SQLite + locale configuration
+  companion/                           optional AI companion component: user helper, admin proxy, read API
+  config/                              JDBC/SQLite + locale + CSP configuration
   domain/                              form, read model, allowed-value registry
   repository/                          prepared SQLite queries
   service/                             demo seeder, useful-vote tracker, rate limiters, admin auth
@@ -204,13 +238,20 @@ src/main/resources/
   schema.sql
   messages.properties                  English root
   messages_zh_HK.properties            human-written standard written Traditional Chinese
+  messages-companion.properties        optional AI companion, English
+  messages-companion_zh_HK.properties  optional AI companion, zh-HK
   static/css/site.css                  the design system + page styles
   static/css/admin.css                 back-office layout
+  static/css/companion.css             optional user-helper styles
+  static/css/companion-admin.css       optional admin-helper styles
   static/js/site.js                    minimal vanilla progressive enhancement
+  static/js/companion.js               optional user-helper prefill bridge (postMessage, no auto-submit)
+  static/js/companion-admin.js         optional admin-helper page script
   static/fonts/                        webfonts + OFL for Instrument Sans
 src/main/webapp/WEB-INF/jsp/           JSP views and shared fragments
 src/main/webapp/WEB-INF/jsp/admin/     admin login, dashboard, detail, delete pages
-src/test/java/com/oiep/                55 tests
+src/main/webapp/WEB-INF/jsp/companion/ optional user-helper and admin-helper views
+src/test/java/com/oiep/                321 tests
 ```
 
 ## Tests
@@ -229,8 +270,9 @@ The suite covers:
 - demo seeding only when explicitly enabled
 - home/browse/report/about routes and the styled error path
 - admin login redirects, CSRF rejection, login throttling, hide/restore/delete and hidden-report 404s
+- the optional AI companion: disabled-by-default behaviour (no routes, page snippets or CSP changes), the user-helper fragment and prefill bridge, the read-API contract/auth/pagination/tombstones, and the admin proxy (admin session, CSRF, allowlists, `502` on failure)
 
-GitHub Actions runs the same `./mvnw -B -ntp verify` suite on every push and pull request, then builds the Docker image and smoke-tests `/`, response headers and the `/admin` redirect.
+GitHub Actions runs the same `./mvnw -B -ntp verify` suite on every push and pull request, then builds the Docker image and smoke-tests `/`, the security headers (CSP SHA-256 hashes with no `'unsafe-inline'`, `nosniff`, `X-Frame-Options: DENY`, COOP), the relative `/admin` redirect and the session-cookie flags (`Secure`/`HttpOnly`/`SameSite=Lax`). Dependabot opens weekly Maven, GitHub Actions and Docker base-image update pull requests.
 
 ## Fonts and licensing
 

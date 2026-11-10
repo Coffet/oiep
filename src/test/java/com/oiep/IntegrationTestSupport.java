@@ -2,7 +2,9 @@ package com.oiep;
 
 import com.oiep.domain.Report;
 import com.oiep.repository.ReportRepository;
+import com.oiep.service.AdminLoginPageRateLimiter;
 import com.oiep.service.AdminLoginRateLimiter;
+import com.oiep.service.HelpfulVoteRateLimiter;
 import com.oiep.service.SubmissionRateLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +54,12 @@ public abstract class IntegrationTestSupport {
     protected AdminLoginRateLimiter adminLoginRateLimiter;
 
     @Autowired
+    protected AdminLoginPageRateLimiter adminLoginPageRateLimiter;
+
+    @Autowired
+    protected HelpfulVoteRateLimiter helpfulVoteRateLimiter;
+
+    @Autowired
     protected ApplicationContext applicationContext;
 
     @BeforeEach
@@ -59,6 +67,8 @@ public abstract class IntegrationTestSupport {
         jdbcTemplate.update("DELETE FROM reports");
         rateLimiter.reset();
         adminLoginRateLimiter.reset();
+        adminLoginPageRateLimiter.reset();
+        helpfulVoteRateLimiter.reset();
     }
 
     protected static Report sampleReport(String company, String round, String outcome, String workMode,

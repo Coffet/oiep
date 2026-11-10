@@ -251,6 +251,11 @@
     </p>
   </section>
 
+  <%-- Optional component slot: extensions render only when a component bean is active. --%>
+  <c:forEach items="${pageExtensions}" var="extension">
+    <c:if test="${extension.page eq 'index'}"><jsp:include page="${extension.fragment}"/></c:if>
+  </c:forEach>
+
   <section class="lookup" aria-labelledby="lookup-heading">
     <div class="lookup__search">
       <h2 class="sr-only" id="lookup-heading"><spring:message code="home.lookup.label"/></h2>

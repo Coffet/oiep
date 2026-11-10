@@ -24,16 +24,29 @@ services:
     init: true
     security_opt:
       - no-new-privileges:true
+    # The JVM needs ordinary file and network access only, never Linux capabilities.
+    cap_drop:
+      - ALL
+    # Bound the process count (threads count as pids) so a runaway or compromised process
+    # cannot fork-bomb the host. The JVM uses well under this.
+    pids_limit: 512
     environment:
       TZ: ${TZ:-Asia/Hong_Kong}
       OIEP_DB_PATH: /data/oiep.db
       OIEP_DEMO_DATA: ${OIEP_DEMO_DATA:-false}
       OIEP_ADMIN_USERNAME: ${OIEP_ADMIN_USERNAME:-admin}
       OIEP_ADMIN_PASSWORD: ${OIEP_ADMIN_PASSWORD:-}
-      # Cloudflare Tunnel forwards the real client IP in X-Forwarded-For.
-      # Safe here because the app port is bound to loopback only. Do not turn
-      # this on for a directly exposed instance (clients could spoof the header).
-      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      # Visitors reach this container only through Cloudflare Tunnel, and the app port is
+      # bound to loopback, so every request that arrives here passed through Cloudflare.
+      # The app uses Tomcat's native RemoteIpValve (application.properties) pointed at
+      # Cloudflare's CF-Connecting-IP header: client-supplied X-Forwarded-For / Forwarded
+      # headers are ignored, so per-IP throttles cannot be bypassed by rotating them, and
+      # forwarded Host values cannot forge redirects. Host/scheme still come from the
+      # trusted tunnel hop, which is what absolute redirects and HSTS need.
+      OIEP_TRUST_CLOUDFLARE_CONNECTING_IP: ${OIEP_TRUST_CLOUDFLARE_CONNECTING_IP:-true}
+      # The public site is HTTPS (TLS terminates at Cloudflare), so sessions can be
+      # marked Secure. Local plain-HTTP development outside Docker keeps the default false.
+      OIEP_SESSION_COOKIE_SECURE: ${OIEP_SESSION_COOKIE_SECURE:-true}
     volumes:
       - oiep-data:/data
     ports:
@@ -48,6 +61,12 @@ services:
     image: cloudflare/cloudflared:latest
     profiles: ["tunnel"]
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # The tunnel only makes outbound connections; it needs no capabilities.
+    cap_drop:
+      - ALL
+    pids_limit: 128
     depends_on:
       app:
         condition: service_healthy

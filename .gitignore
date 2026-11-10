@@ -17,6 +17,11 @@ backups/
 .env.*
 !.env.example
 
+### Security assessment artifacts (internal: audit reports + exploitation PoCs) ###
+# Keep these local unless a maintainer deliberately publishes a curated report; a plain
+# `git add -A` must not leak the internal assessment or its attack scripts.
+/security/
+
 ### IDE ###
 .idea/
 *.iml

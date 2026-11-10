@@ -1,0 +1,40 @@
+# Dependabot update configuration.
+#
+# Weekly pull requests for the Maven build, the GitHub Actions used by CI, and the Docker
+# base images. Review and merge them deliberately; CI (including the Docker smoke test's
+# security-header assertions) runs on every pull request.
+#
+# Note: the `docker` ecosystem updates Dockerfile base images, not `compose.yaml` service
+# images. The Cloudflare Tunnel image in compose.yaml (`cloudflare/cloudflared:latest`) is
+# intentionally reviewed and pinned by hand - see docs/DEPLOY.md.
+version: 2
+
+updates:
+  - package-ecosystem: maven
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      maven-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

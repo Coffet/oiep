@@ -1,0 +1,275 @@
+/* =========================================================
+   OIEP — optional AI companion: user-helper section
+   Rendered after the debrief form only while the companion is enabled.
+   Design contract: quiet appendix to the form, not a second hero. Warm
+   paper, ink hairlines, one correction-red mark; no cards, gradients,
+   radius, shadows or SaaS chrome. Tokens are shared with site.css (with
+   fallbacks so this file is harmless if loaded alone).
+   ========================================================= */
+
+.companion-helper {
+  margin-top: clamp(4.5rem, 12vh, 8rem);
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--rule-strong, rgba(17, 24, 32, 0.5));
+  color: var(--ink, #111820);
+  font-family: var(--font-sans, "Instrument Sans", "Noto Sans HK", "PingFang HK", sans-serif);
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+}
+
+/* Optional tag next to the heading — quiet, like an editorial margin note. */
+.companion-helper__optional {
+  padding: 0.14rem 0.36rem;
+  border: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
+  font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute, #6b675b);
+}
+
+.companion-helper__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 21rem) minmax(0, 40rem);
+  align-items: start;
+  justify-content: space-between;
+  gap: clamp(2rem, 5vw, 5rem);
+  padding-top: clamp(1.3rem, 3vw, 2.1rem);
+}
+
+.companion-helper__intro,
+.companion-helper__panel {
+  min-width: 0;
+}
+
+.companion-helper__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.9rem;
+  margin: 0 0 0.85rem;
+}
+
+.companion-helper__title {
+  margin: 0;
+  font-size: clamp(1.375rem, 2.1vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.companion-helper__lead {
+  max-width: 44ch;
+  margin: 0 0 1.6rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--ink-soft, #4b4a42);
+}
+
+.companion-helper__privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  max-width: 46ch;
+  margin: 0;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--ink-mute, #6b675b);
+}
+
+.companion-helper__lock {
+  flex: none;
+  margin-top: 0.15rem;
+  color: var(--ink-mute, #6b675b);
+}
+
+/* The widget sheet: a hairline frame on the paper, nothing more. */
+.companion-helper__frame {
+  border: 1px solid var(--rule-strong, rgba(17, 24, 32, 0.5));
+  background: var(--paper-light, #faf3e3);
+}
+
+.companion-helper__iframe {
+  display: block;
+  width: 100%;
+  height: clamp(26rem, 66vh, 40rem);
+  border: 0;
+  background: var(--paper-light, #faf3e3);
+}
+
+.companion-helper__hint {
+  margin: 0.7rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ink-mute, #6b675b);
+}
+
+.companion-helper__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1.35rem;
+}
+
+.companion-helper__apply {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.75rem;
+  min-height: 2.75rem; /* 44px tap target */
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--ink, #111820);
+  background: transparent;
+  color: var(--ink, #111820);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease-soft, ease),
+    border-color 0.2s var(--ease-soft, ease), color 0.2s var(--ease-soft, ease);
+}
+
+.companion-helper .eyebrow {
+  color: var(--ink-mute, #6b675b);
+}
+
+.companion-helper__apply:not([disabled]):hover {
+  background: var(--ink, #111820);
+  border-color: var(--ink, #111820);
+  color: var(--paper-light, #faf3e3);
+}
+
+.companion-helper__apply:active {
+  transform: translateY(1px);
+}
+
+.companion-helper__apply:focus-visible {
+  outline: var(--focus, 2px solid #a92f1d);
+  outline-offset: 4px;
+}
+
+.companion-helper__apply[disabled] {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.companion-helper__apply[disabled] .companion-helper__arrow {
+  transform: none;
+}
+
+.companion-helper__arrow {
+  flex: none;
+  transition: transform 0.25s var(--ease-out, ease);
+}
+
+.companion-helper__apply:not([disabled]):hover .companion-helper__arrow {
+  transform: translateX(0.25rem);
+}
+
+.companion-helper__note {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ink-mute, #6b675b);
+}
+
+/* Status: reserved line (no layout jump when it fills). The correction-red
+   mark appears only once there is something to review. */
+.companion-helper__status {
+  min-height: 1.5em;
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--ink, #111820);
+}
+
+.companion-helper__status:not(:empty) {
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--accent, #a92f1d);
+}
+
+.companion-helper__fallback {
+  margin: 0.7rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--ink-soft, #4b4a42);
+}
+
+/* Without JavaScript the iframe still works; hide the bridge-only controls. */
+.no-js .companion-helper__actions,
+.no-js .companion-helper__status {
+  display: none;
+}
+
+/* =========================================================
+   Responsive — single column, no horizontal overflow at 320px
+   ========================================================= */
+
+@media (max-width: 1024px) {
+  .companion-helper__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+
+  .companion-helper__lead {
+    max-width: 58ch;
+    margin-bottom: 1.2rem;
+  }
+
+  .companion-helper__privacy {
+    max-width: 58ch;
+  }
+
+  .companion-helper__iframe {
+    height: clamp(24rem, 62vh, 34rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .companion-helper {
+    margin-top: 3.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .companion-helper__grid {
+    padding-top: 1.1rem;
+  }
+
+  .companion-helper__apply {
+    width: 100%;
+  }
+
+  .companion-helper__note {
+    flex-basis: 100%;
+  }
+
+  .companion-helper__iframe {
+    height: clamp(22rem, 58vh, 30rem);
+  }
+}
+
+/* =========================================================
+   Motion, contrast, print
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-helper__apply,
+  .companion-helper__arrow {
+    transition: none;
+  }
+}
+
+@media print {
+  /* The widget is interactive, not printable: printing the page prints the form only. */
+  .companion-helper {
+    display: none !important;
+  }
+}
