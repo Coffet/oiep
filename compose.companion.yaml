@@ -16,9 +16,10 @@
 # Requirements, in order of importance:
 #   * A sibling checkout of https://github.com/Coffet/oiep-backendAI at
 #     ../oiep-backendAI (default below), or a prebuilt image via OIEP_AI_IMAGE.
-#   * .env (copy .env.example): OIEP_COMPANION_ADMIN_TOKEN, OIEP_COMPANION_READ_TOKEN
-#     and OIEP_AI_IP_HASH_SALT must be real secrets; with OIEP_AI_ENV=prod the
-#     companion refuses to start with weak/missing ones.
+#   * .env (copy .env.example): OIEP_COMPANION_ADMIN_TOKEN and OIEP_AI_IP_HASH_SALT
+#     are REQUIRED: Compose itself refuses to start without them (the companion runs
+#     with OIEP_AI_ENV=prod and fails closed on weak/missing secrets). Set
+#     OIEP_COMPANION_READ_TOKEN too if you want corpus sync to work.
 #   * The user-helper widget is loaded by the visitor's BROWSER, so it needs a
 #     browser-reachable public URL (OIEP_COMPANION_WIDGET_URL). "http://ai:8090"
 #     is only the internal server-side address and cannot be used for the iframe.
@@ -57,10 +58,12 @@ services:
       OIEP_COMPANION_USER_HELPER_ENABLED: ${OIEP_COMPANION_USER_HELPER_ENABLED:-false}
       OIEP_COMPANION_WIDGET_URL: ${OIEP_COMPANION_WIDGET_URL:-}
 
-      # Operator admin helper at /admin/assistant. Enabled by default; without a
-      # usable OIEP_COMPANION_ADMIN_TOKEN it fails closed (no page, no routes).
+      # Operator admin helper at /admin/assistant. Enabled by default; the token
+      # is required by the overlay (Compose refuses to start without it) because
+      # the companion runs with OIEP_AI_ENV=prod, which fails closed on a weak or
+      # missing admin token. Generate one (32+ chars) and set it in .env.
       OIEP_COMPANION_ADMIN_HELPER_ENABLED: ${OIEP_COMPANION_ADMIN_HELPER_ENABLED:-true}
-      OIEP_COMPANION_ADMIN_TOKEN: ${OIEP_COMPANION_ADMIN_TOKEN:-}
+      OIEP_COMPANION_ADMIN_TOKEN: "${OIEP_COMPANION_ADMIN_TOKEN:?OIEP_COMPANION_ADMIN_TOKEN is required: generate a 32+ character secret and set it in .env (see docs/COMPANION.md)}"
 
       # Read-only experiences API used by the companion's corpus sync. Harmless
       # without a usable token: the endpoint is then not registered at all.
@@ -113,8 +116,11 @@ services:
       OIEP_AI_DB_PATH: /data/oiep-ai.sqlite3
 
       # Token pair 1: companion operator API == OIEP admin helper token.
-      OIEP_AI_ADMIN_TOKEN: ${OIEP_COMPANION_ADMIN_TOKEN:-}
-      OIEP_AI_IP_HASH_SALT: ${OIEP_AI_IP_HASH_SALT:-}
+      # Required: the companion runs with OIEP_AI_ENV=prod and refuses to create
+      # its app without a 32+ character token; the compose file fails fast too.
+      OIEP_AI_ADMIN_TOKEN: "${OIEP_COMPANION_ADMIN_TOKEN:?OIEP_COMPANION_ADMIN_TOKEN is required: generate a 32+ character secret and set it in .env (see docs/COMPANION.md)}"
+      # Required in prod: salt used to hash visitor IPs (16+ characters).
+      OIEP_AI_IP_HASH_SALT: "${OIEP_AI_IP_HASH_SALT:?OIEP_AI_IP_HASH_SALT is required: generate a 16+ character random salt and set it in .env (see docs/COMPANION.md)}"
       OIEP_AI_ADMIN_IP_ALLOWLIST: ${OIEP_AI_ADMIN_IP_ALLOWLIST:-}
       OIEP_AI_CORS_ORIGINS: ${OIEP_AI_CORS_ORIGINS:-}
 

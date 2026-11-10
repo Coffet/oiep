@@ -310,10 +310,27 @@ is an **optional overlay** that adds an `ai` service and adds the `OIEP_COMPANIO
 variables to the existing `app` service:
 
 ```bash
-# .env: set the two tokens (and optionally the companion settings) — see .env.example
+# .env: OIEP_COMPANION_ADMIN_TOKEN and OIEP_AI_IP_HASH_SALT are REQUIRED (see below);
+# compile the effective configuration first — this fails fast if a secret is missing.
+docker compose -f compose.yaml -f compose.companion.yaml config >/dev/null
 docker compose -f compose.yaml -f compose.companion.yaml up -d --build
 docker compose -f compose.yaml -f compose.companion.yaml ps
 docker compose -f compose.yaml -f compose.companion.yaml logs -f ai
+```
+
+**Before the first `up`:** copy `.env.example` to `.env` and set
+`OIEP_COMPANION_ADMIN_TOKEN` (32+ random characters), `OIEP_AI_IP_HASH_SALT` (16+ random
+characters) and — for sync — `OIEP_COMPANION_READ_TOKEN` (16+ random characters). The overlay
+marks the token and salt as required, so `docker compose config`/`up` stop with a clear
+"required variable … is missing a value" error instead of starting a companion container that
+fails on every request with `ValueError: OIEP_AI_ADMIN_TOKEN is required in production` (the
+companion creates its app lazily, so a missing prod secret surfaces as HTTP 500s from `/healthz`
+rather than a startup exit). Generate the secrets with:
+
+```bash
+python3 -c 'import secrets; print("OIEP_COMPANION_ADMIN_TOKEN=" + secrets.token_urlsafe(48))'
+python3 -c 'import secrets; print("OIEP_COMPANION_READ_TOKEN=" + secrets.token_urlsafe(32))'
+python3 -c 'import secrets; print("OIEP_AI_IP_HASH_SALT=" + secrets.token_urlsafe(32))'
 ```
 
 How the overlay wires things:
@@ -366,8 +383,10 @@ companion widget:
 
 ### First-boot checklist for the overlay
 
-1. `cp .env.example .env` and set: `OIEP_COMPANION_ENABLED=true`, `OIEP_COMPANION_ADMIN_TOKEN`
-   (32+ chars), `OIEP_COMPANION_READ_TOKEN` (16+ chars), `OIEP_AI_IP_HASH_SALT` (16+ chars).
+1. `cp .env.example .env` and set the required secrets: `OIEP_COMPANION_ADMIN_TOKEN`
+   (32+ chars) and `OIEP_AI_IP_HASH_SALT` (16+ chars), plus `OIEP_COMPANION_READ_TOKEN`
+   (16+ chars) if you want corpus sync. The overlay's `${VAR:?…}` guards make `docker compose
+   config`/`up` fail immediately when the token or salt is missing — fix `.env` and re-run.
    The overlay defaults `OIEP_COMPANION_BASE_URL` to `http://ai:8090`; leave it alone unless you
    customize the service name.
 2. For sync, set `OIEP_AI_OIEP_BASE_URL=https://your-public-oiep-host` and
@@ -859,6 +878,7 @@ trivial. Removing them is optional; if you do, also revert `WebConfig`'s CSP met
 | Companion sync says `error` | Check `GET /v1/admin/corpus/sync` on the companion (`last_error`) and the OIEP read-API status/token; `OIEP_AI_ENV=prod` requires an `https://` OIEP base URL. |
 | Hidden/deleted report still in the companion mirror | The read-API triggers were created only while the component was running; trigger a full resync, and confirm `companion_report_events` exists. |
 | Admin delete of a report fails with `no such table: companion_report_events` | Someone dropped the component table but left its triggers. Recreate the table or run the uninstall SQL (drops triggers first), or restore the component code, then clean up in the documented order. |
+| Docker overlay: companion starts but every request returns 500 and the log ends with `ValueError: OIEP_AI_ADMIN_TOKEN is required in production` | `.env` is missing `OIEP_COMPANION_ADMIN_TOKEN` (the overlay maps it to `OIEP_AI_ADMIN_TOKEN`) or it is empty/weak. With `OIEP_AI_ENV=prod` the companion validates on app creation, and it creates the app lazily per request, so uvicorn stays up while `/healthz` 500s. Set a 32+ character token in `.env` (and `OIEP_AI_IP_HASH_SALT`), then `docker compose -f compose.yaml -f compose.companion.yaml up -d --force-recreate ai app`. Current overlays fail fast: run `docker compose … config` first and it names the missing variable. |
 | Docker overlay: companion restarts in a loop | `OIEP_AI_ENV=prod` fail-closed checks: admin token < 32 chars, missing IP salt, non-HTTPS `OIEP_AI_OIEP_BASE_URL`/CORS origins. `docker compose logs ai` names the variable. |
 | All widget visitors share one rate-limit bucket / audit hashes are identical | The companion does not trust the `cloudflared`/Compose peer, so it ignores `X-Forwarded-For`. Set `OIEP_AI_TRUSTED_PROXIES` to the Compose network CIDR (the overlay's default private ranges cover the usual Docker networks). |
 | `.env` changes have no effect | Compose keeps the existing container configuration; re-run with `up -d --force-recreate` (and `--build` if images changed). |
