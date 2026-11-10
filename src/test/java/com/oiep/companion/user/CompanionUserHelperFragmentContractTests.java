@@ -123,28 +123,41 @@ class CompanionUserHelperFragmentContractTests {
         String script = read(SCRIPT);
         String css = read(STYLE);
 
-        // Server-rendered state: launcher collapsed, panel hidden (no-JS friendly), both
-        // controlled by a single toggle. The launcher is a real link so it still works
-        // without JavaScript (it opens the standalone widget).
+        // Server-rendered state: round chat button collapsed, chat overlay hidden (no-JS
+        // friendly), both controlled by a single toggle. The button is a real link so it
+        // still works without JavaScript (it opens the standalone widget).
         assertThat(jsp).contains("class=\"companion-helper__launcher\"");
         assertThat(jsp).contains("target=\"_blank\"");
         assertThat(jsp).contains("rel=\"noopener noreferrer\"");
         assertThat(jsp).contains("class=\"companion-helper__panel\"");
         assertThat(jsp).contains("hidden>");
         assertThat(jsp).contains("id=\"companion-helper-panel\"");
+        // Chat-window anatomy: dark chat header (avatar + title + close), embedded chat,
+        // compact action bar.
+        assertThat(jsp).contains("companion-helper__head");
+        assertThat(jsp).contains("companion-helper__avatar");
+        assertThat(jsp).contains("companion-helper__title");
+        assertThat(jsp).contains("companion-helper__close");
+        assertThat(jsp).contains("companion-helper__dismiss");
+        assertThat(jsp).contains("companion-helper__frame");
+        assertThat(jsp).contains("data-msg-close");
 
-        // Floating layout, fixed position, compact width; no rounded card chrome.
+        // Floating chat styling: a round launcher and an elevated, rounded chat overlay
+        // (the one intentionally raised surface on the site); no gradients anywhere.
         assertThat(css).contains(".companion-helper__launcher");
         assertThat(css).contains(".companion-helper__panel");
         assertThat(css).contains("position: fixed");
-        assertThat(css).contains("calc(100vw - 1.8rem)");
+        assertThat(css).contains("border-radius: 50%");
+        assertThat(css).contains("box-shadow");
         assertThat(css).contains(".companion-helper__panel[hidden]");
-        assertThat(css).doesNotContain("linear-gradient", "border-radius", "box-shadow");
+        assertThat(css).contains(".companion-helper__head");
+        assertThat(css).doesNotContain("linear-gradient");
 
         // The script toggles it: aria-expanded, hidden attribute, Escape and outside click.
         assertThat(script).contains("data-companion-launcher");
         assertThat(script).contains("[data-companion-close]");
         assertThat(script).contains("aria-expanded");
+        assertThat(script).contains("data-msg-close");
         assertThat(script).contains("panel.hidden");
         assertThat(script).contains("\"Escape\"");
         assertThat(script).contains("closePanel");
@@ -214,9 +227,9 @@ class CompanionUserHelperFragmentContractTests {
     void stylesheetFollowsTheOiepDesignAndAccessibilityContract() throws IOException {
         String css = read(STYLE);
 
-        // Shared design tokens (warm paper / ink / correction red), no card SaaS chrome.
+        // Shared design tokens (warm paper / ink / correction red), no gradients.
         assertThat(css).contains("var(--paper", "var(--ink", "var(--accent", "var(--font-sans");
-        assertThat(css).doesNotContain("linear-gradient", "border-radius", "box-shadow");
+        assertThat(css).doesNotContain("linear-gradient");
         // 44px tap target, visible focus, reduced motion, print-safe.
         assertThat(css).contains("min-height: 2.75rem");
         assertThat(css).contains(":focus-visible");

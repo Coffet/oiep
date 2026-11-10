@@ -129,19 +129,20 @@ read-only OIEP experiences API) and stay independently deployable.
 
 | Surface | Where | Enabled by |
 | --- | --- | --- |
-| **User helper** | Floating web-chat launcher (bottom-right) on the public form page `/`; opens a compact dialog with the companion's own widget | `OIEP_COMPANION_ENABLED` + `OIEP_COMPANION_USER_HELPER_ENABLED` |
+| **User helper** | Round chat button (bottom-right) on the public form page `/`; opens a closable chat overlay with the companion's own chat widget | `OIEP_COMPANION_ENABLED` + `OIEP_COMPANION_USER_HELPER_ENABLED` |
 | **Read-only experiences API** | `GET /api/v1/experiences` (`oiep-read-api/v1`), pulled by the companion's operator corpus sync | `+ OIEP_COMPANION_READ_API_ENABLED` |
 | **Operator admin helper** | `/admin/assistant` inside the existing admin area, server-side proxy to the companion's `/v1/admin/*` | `+ OIEP_COMPANION_ADMIN_HELPER_ENABLED` (see the configuration table below) |
 
-**User helper UX.** A compact launcher fixed to the bottom-right corner of the landing page opens a
-small floating panel that embeds the companion widget in a sandboxed iframe. It is collapsed by
-default; `Esc`, the close button or a click outside collapses it again, and focus returns to the
-launcher. Without JavaScript the launcher is a plain link that opens the standalone widget (`/ui/`)
-in a new tab. The visitor's browser loads the widget directly from the companion's origin, and OIEP
-adds **exactly that origin** to the CSP `frame-src` (never a wildcard). A “Use the helper’s answers”
-button asks the widget for the reviewed draft and fills matching form fields over an
-origin-checked `postMessage` hand-off; it only fills empty fields, never overwrites answers and
-**never submits**. Every string is bilingual (English + human-written zh-HK).
+**User helper UX.** A round chat button floats in the bottom-right corner of the landing page and
+opens a closable chat overlay: a dark chat header (bot avatar, “Form helper”, close button), the
+companion's chat widget filling the body, and a compact action bar with the “Use the helper’s
+answers” button. The button swaps to a close icon while open; `Esc`, the header close button or a
+click outside closes it and focus returns to the button. Without JavaScript the button is a plain
+link that opens the standalone widget (`/ui/`) in a new tab, and the overlay stays hidden. The
+visitor's browser loads the widget directly from the companion's origin, and OIEP adds **exactly
+that origin** to the CSP `frame-src` (never a wildcard). The prefill hand-off is an origin-checked
+`postMessage` conversation; it only fills empty fields, never overwrites answers and **never
+submits**. Every string is bilingual (English + human-written zh-HK).
 
 **Admin helper.** `/admin/assistant` is protected by the normal admin session; mutations require the
 per-session CSRF token, and the companion bearer token never reaches the browser. Only fixed

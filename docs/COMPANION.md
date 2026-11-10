@@ -44,7 +44,7 @@ route, no page fragment, no CSP change), and the startup log says why.
 
 | Surface | Where | Master switch + sub-switch | Default | Requires |
 | --- | --- | --- | --- | --- |
-| **User helper** | Floating chat launcher (bottom-right) on the public form page (`/`) that opens the companion widget in a compact panel | `OIEP_COMPANION_ENABLED` + `OIEP_COMPANION_USER_HELPER_ENABLED` | master off; user helper on *within* the enabled component | a browser-reachable companion **widget URL** |
+| **User helper** | Round chat button (bottom-right) on the public form page (`/`) that opens a closable chat overlay with the companion widget | `OIEP_COMPANION_ENABLED` + `OIEP_COMPANION_USER_HELPER_ENABLED` | master off; user helper on *within* the enabled component | a browser-reachable companion **widget URL** |
 | **Read-only experiences API** | `GET /api/v1/experiences` for the companion's admin corpus sync | + `OIEP_COMPANION_READ_API_ENABLED` | off | a read-only bearer token (`OIEP_COMPANION_READ_TOKEN`) |
 | **Operator admin helper** | `GET /admin/assistant` in the existing admin area, server-side proxy to `/v1/admin/*` | + `OIEP_COMPANION_ADMIN_HELPER_ENABLED` | off | companion base URL + operator bearer token (`OIEP_COMPANION_ADMIN_TOKEN`) |
 
@@ -100,15 +100,16 @@ Consequences worth remembering:
 
 The iframe is a complete widget on its own; OIEP adds three progressive enhancements around it:
 
-1. **Launcher + panel** — instead of taking over a page section, the helper is a compact
-   web-chat launcher fixed to the bottom-right corner. Clicking it opens a small floating panel
-   (dialog) containing the configured widget URL in a sandboxed iframe
-   (`allow-scripts allow-forms allow-same-origin`, `loading="lazy"`,
-   `referrerpolicy="no-referrer"`). The visitor chats inside the frame; OIEP sees no messages.
-   Escape or the close button collapses the panel again. **Without JavaScript** the launcher is a
-   plain link that opens the same standalone widget (`/ui/`) in a new tab, and the panel stays
-   out of the way.
-2. **Prefill** — a "Use the helper's answers" button in the panel asks the widget for the
+1. **Chat button + overlay** — instead of taking over a page section, the helper is a round chat
+   button fixed to the bottom-right corner. Clicking it opens a closable chat overlay (dialog) with
+   a dark chat header (avatar, "Form helper", close button) and the configured widget URL filling the
+   body in a sandboxed iframe (`allow-scripts allow-forms allow-same-origin`, `loading="lazy"`,
+   `referrerpolicy="no-referrer"`); a compact action bar under the chat holds the prefill button and
+   its status. The button swaps to a close icon while open; Escape, the header close button or an
+   outside click closes the overlay. The visitor chats inside the frame; OIEP sees no messages.
+   **Without JavaScript** the button is a plain link that opens the same standalone widget (`/ui/`)
+   in a new tab, and the overlay stays out of the way.
+2. **Prefill** — a "Use the helper's answers" button in the action bar asks the widget for the
    reviewed draft and fills matching form fields. The hand-off is an origin-checked
    `postMessage` conversation:
 
@@ -295,7 +296,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8090 --workers 1
 | Check | How | Expected |
 | --- | --- | --- |
 | Component is wired | the OIEP startup log | `AI companion component enabled: … userHelper=true adminHelper=true readApi=true` |
-| User helper | open <http://localhost:8080/> and click the floating "Form helper" launcher at the bottom-right | the launcher opens the widget panel; Escape/close collapses it |
+| User helper | open <http://localhost:8080/> and click the round chat button at the bottom-right | a closable chat overlay opens with the widget; Escape/close collapses it |
 | CSP | `curl -sI http://localhost:8080/` | `frame-src 'self' http://127.0.0.1:8090` in `Content-Security-Policy` |
 | Admin helper | sign in at `/admin` and open `/admin/assistant` | status card loads when the companion is up |
 | Read API | the curl below | `{"items":[...],"next_cursor":…,"has_more":false}` |

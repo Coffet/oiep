@@ -459,7 +459,16 @@
     if (!panel) return;
     panel.hidden = !open;
     root.classList.toggle("is-open", open);
-    if (launcher) launcher.setAttribute("aria-expanded", open ? "true" : "false");
+    if (launcher) {
+      launcher.setAttribute("aria-expanded", open ? "true" : "false");
+      // The round button swaps between the chat icon and a close icon; keep its
+      // accessible name in sync (both labels come from the server-rendered bundle).
+      const label = root.getAttribute(open ? "data-msg-close" : "data-msg-launcher");
+      if (label) {
+        launcher.setAttribute("aria-label", label);
+        launcher.setAttribute("title", label);
+      }
+    }
   };
 
   const openPanel = () => {
