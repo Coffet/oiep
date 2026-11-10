@@ -1,64 +1,65 @@
-/* =========================================================
-   OIEP — optional AI companion: floating chat widget
-   A round chat button in the bottom-right corner opens a closable chat overlay
-   (header + embedded companion chat + compact action bar). The rest of the site
-   stays flat and print-like; this small widget is the one elevated surface, so
-   it may use a soft shadow and rounded corners to read as a chat window.
-   Tokens are shared with site.css (with fallbacks so this file is harmless if
-   loaded alone). No gradients.
-   ========================================================= */
+/* ==========================================================================
+   OIEP — optional form-helper overlay ("field notes" edition)
+   A cream paper panel with an ink masthead, one correction-red accent and a
+   hard print-style offset shadow. Matches the redesigned widget.
+   ========================================================================== */
 
 .companion-helper {
-  position: fixed;
-  inset: auto 0 0 auto;
-  z-index: 70;
-  color: var(--ink, #111820);
-  font-family: var(--font-sans, "Instrument Sans", "Noto Sans HK", "PingFang HK", sans-serif);
-  font-size: 1rem;
-  line-height: 1.5;
-  overflow-wrap: break-word;
-  pointer-events: none;
+  --paper: #f6ecd6;
+  --paper-2: #fbf5e7;
+  --paper-3: #efe3c9;
+  --ink: #14181c;
+  --ink-mute: #6f6858;
+  --rule: #d9c9a9;
+  --rule-strong: #b3a27f;
+  --accent: #a92f1d;
+  --accent-2: #8a2517;
+  --accent-text: #fbf5e7;
+  --olive: #6b7a54;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "Noto Sans HK", "PingFang HK",
+    "Microsoft JhengHei", sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+    "Noto Serif", "Songti TC", "Times New Roman", serif;
 }
 
-.companion-helper > * {
-  pointer-events: auto;
-}
-
-/* ---------------------------------------------------------
-   Round chat button (a plain link without JavaScript)
-   --------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Launcher: an ink stamp with a fine red ring
+   -------------------------------------------------------------------------- */
 
 .companion-helper__launcher {
   position: fixed;
   right: clamp(1rem, 2.5vw, 1.75rem);
   bottom: calc(1.15rem + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 3.75rem;
-  height: 3.75rem; /* 60px tap target */
+  height: 3.75rem;
   min-height: 2.75rem;
   padding: 0;
-  border: 1px solid var(--ink, #111820);
+  border: 1px solid var(--ink);
   border-radius: 50%;
-  background: var(--ink, #111820);
-  color: var(--paper-light, #faf3e3);
+  background: var(--ink);
+  color: var(--paper-2);
   cursor: pointer;
-  box-shadow: 0 12px 30px rgba(17, 24, 32, 0.28);
-  transition: background-color 0.2s var(--ease-soft, ease), color 0.2s var(--ease-soft, ease),
-    transform 0.2s var(--ease-out, ease);
+  box-shadow: 0 0 0 3px var(--paper-2), 0 0 0 4px var(--accent),
+    0 14px 28px rgba(20, 24, 28, 0.28);
+  transition: background-color 0.18s ease, color 0.18s ease,
+    transform 0.18s ease;
 }
 
 .companion-helper__launcher:hover {
-  background: var(--paper-light, #faf3e3);
-  color: var(--ink, #111820);
+  background: var(--accent);
+  color: var(--accent-text);
   transform: translateY(-2px);
 }
 
 .companion-helper__launcher:focus-visible,
 .companion-helper__close:focus-visible,
 .companion-helper__apply:focus-visible {
-  outline: var(--focus, 2px solid #a92f1d);
+  outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -67,7 +68,6 @@
   flex: none;
 }
 
-/* The button turns into a close icon while the chat is open. */
 .companion-helper__dismiss {
   display: none;
 }
@@ -80,43 +80,47 @@
   display: block;
 }
 
-/* ---------------------------------------------------------
-   Chat overlay — header, embedded chat, compact action bar
-   --------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Panel
+   -------------------------------------------------------------------------- */
 
 .companion-helper__panel {
   position: fixed;
   right: clamp(1rem, 2.5vw, 1.75rem);
   bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  z-index: 59;
   display: flex;
   flex-direction: column;
   width: min(30rem, calc(100vw - 2rem));
   height: min(46rem, 86vh);
   overflow: hidden;
-  border: 1px solid var(--ink, #111820);
-  border-radius: 0.9rem;
-  background: var(--paper-light, #faf3e3);
-  color: var(--ink, #111820);
-  font-family: var(--font-sans, "Instrument Sans", "Noto Sans HK", "PingFang HK", sans-serif);
+  border: 1px solid var(--ink);
+  border-top: 4px solid var(--accent);
+  border-radius: 4px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.5;
   overflow-wrap: break-word;
-  box-shadow: 0 28px 70px rgba(17, 24, 32, 0.34);
+  box-shadow: 9px 10px 0 rgba(20, 24, 28, 0.12),
+    0 26px 60px rgba(20, 24, 28, 0.24);
 }
 
 .companion-helper__panel[hidden] {
   display: none;
 }
 
-/* Header: the one dark bar on the site, so the overlay reads as a chat window. */
+/* Masthead: cream paper, ink rule, display serif title. */
 .companion-helper__head {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex: none;
-  padding: 0.8rem 0.55rem 0.8rem 1.05rem;
-  background: var(--ink, #111820);
-  color: var(--paper-light, #faf3e3);
+  padding: 0.85rem 0.6rem 0.85rem 1rem;
+  border-bottom: 1px solid var(--ink);
+  background: var(--paper-3);
+  color: var(--ink);
 }
 
 .companion-helper__avatar {
@@ -126,9 +130,10 @@
   flex: none;
   width: 2.25rem;
   height: 2.25rem;
-  border: 1px solid rgba(250, 243, 227, 0.4);
-  border-radius: 50%;
-  color: var(--paper-light, #faf3e3);
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: var(--ink);
+  color: var(--paper-2);
 }
 
 .companion-helper__headtext {
@@ -140,14 +145,15 @@
 }
 
 .companion-helper__title {
-  font-size: 1rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.15;
   letter-spacing: -0.01em;
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 
-/* One tidy status row: dot + label on the left, the optional tag anchored right. */
 .companion-helper__byline {
   display: flex;
   align-items: center;
@@ -155,9 +161,12 @@
   flex-wrap: nowrap;
   width: 100%;
   min-width: 0;
-  font-size: 0.75rem;
+  font-size: 0.625rem;
+  font-weight: 800;
   line-height: 1;
-  color: rgba(250, 243, 227, 0.72);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
 }
 
 .companion-helper__dot {
@@ -166,8 +175,7 @@
   height: 0.4375rem;
   margin-top: 0.03rem;
   border-radius: 50%;
-  background: #9cc59a;
-  box-shadow: 0 0 0 2px rgba(156, 197, 154, 0.16);
+  background: var(--accent);
 }
 
 .companion-helper__kicker {
@@ -187,13 +195,14 @@
   margin-left: auto;
   height: 1.0625rem;
   padding: 0 0.35rem;
-  border: 1px solid rgba(250, 243, 227, 0.34);
-  border-radius: 0.25rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
   font-size: 0.5625rem;
-  font-weight: 600;
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: var(--ink-mute);
   transform: translateY(-0.5px);
 }
 
@@ -202,21 +211,22 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 2.75rem; /* 44px tap target */
+  width: 2.75rem;
   min-height: 2.75rem;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 2px;
   background: transparent;
-  color: var(--paper-light, #faf3e3);
+  color: var(--ink);
   cursor: pointer;
 }
 
 .companion-helper__close:hover {
-  background: rgba(250, 243, 227, 0.14);
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
-/* Assistive text only: the visible interface is the chat itself. */
+/* Assistive descriptions stay off the visible surface. */
 .companion-helper__title-lead,
 .companion-helper__lead,
 .companion-helper__privacy,
@@ -228,16 +238,15 @@
   padding: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
-  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
 
-/* Chat body: the companion widget fills the remaining overlay height. */
+/* Embedded widget frame */
 .companion-helper__frame {
   flex: 1 1 auto;
   min-height: 0;
-  background: var(--paper, #f5ebd5);
+  background: var(--paper);
 }
 
 .companion-helper__iframe {
@@ -245,19 +254,22 @@
   width: 100%;
   height: 100%;
   border: 0;
-  background: var(--paper, #f5ebd5);
+  background: var(--paper);
 }
 
-/* Compact action bar under the chat: copy the reviewed draft into the form. */
+/* --------------------------------------------------------------------------
+   Action bar: ink transfer button + micro note
+   -------------------------------------------------------------------------- */
+
 .companion-helper__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem 0.9rem;
   flex: none;
-  padding: 0.8rem 1.1rem 0.9rem;
-  border-top: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
-  background: var(--paper-light, #faf3e3);
+  padding: 0.7rem 1rem 0.8rem;
+  border-top: 1px solid var(--ink);
+  background: var(--paper-3);
 }
 
 .companion-helper__apply {
@@ -266,25 +278,27 @@
   justify-content: space-between;
   gap: 1rem;
   flex: 1 1 100%;
-  min-height: 2.75rem; /* 44px tap target */
-  padding: 0.7rem 0.95rem;
-  border: 1px solid var(--ink, #111820);
-  border-radius: 0.35rem;
-  background: transparent;
-  color: var(--ink, #111820);
+  min-height: 2.75rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--paper-2);
   font: inherit;
-  font-size: 0.875rem;
-  line-height: 1.25;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.2;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.2s var(--ease-soft, ease),
-    border-color 0.2s var(--ease-soft, ease), color 0.2s var(--ease-soft, ease);
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .companion-helper__apply:not([disabled]):hover {
-  background: var(--ink, #111820);
-  border-color: var(--ink, #111820);
-  color: var(--paper-light, #faf3e3);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
 }
 
 .companion-helper__apply:active {
@@ -293,16 +307,13 @@
 
 .companion-helper__apply[disabled] {
   cursor: wait;
-  opacity: 0.6;
-}
-
-.companion-helper__apply[disabled] .companion-helper__arrow {
-  transform: none;
+  opacity: 0.55;
 }
 
 .companion-helper__arrow {
   flex: none;
-  transition: transform 0.25s var(--ease-out, ease);
+  font-family: var(--font-display);
+  transition: transform 0.2s ease;
 }
 
 .companion-helper__apply:not([disabled]):hover .companion-helper__arrow {
@@ -311,26 +322,25 @@
 
 .companion-helper__note {
   flex: 1 1 auto;
-  margin: 0.1rem 0 0;
-  font-size: 0.75rem;
+  margin: 0;
+  font-size: 0.6875rem;
   line-height: 1.4;
-  color: var(--ink-mute, #6b675b);
+  color: var(--ink-mute);
 }
 
-/* Status: reserved line (no layout jump when it fills). The correction-red mark
-   appears only once there is something to review. */
 .companion-helper__status {
   flex: 1 1 100%;
   min-height: 1.3em;
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
-  color: var(--ink, #111820);
+  color: var(--ink-mute);
 }
 
 .companion-helper__status:not(:empty) {
   padding-left: 0.6rem;
-  border-left: 2px solid var(--accent, #a92f1d);
+  border-left: 2px solid var(--accent);
+  color: var(--ink);
 }
 
 .companion-helper__fallback {
@@ -338,20 +348,19 @@
   margin: 0;
   font-size: 0.75rem;
   line-height: 1.45;
-  color: var(--ink-soft, #4b4a42);
+  color: var(--ink-mute);
 }
 
-/* Without JavaScript the button is a plain link to the standalone widget;
-   the overlay and the bridge-only controls stay out of the way. */
+/* No-JS: the iframe and plain launcher link still work. */
 .no-js .companion-helper__panel,
 .no-js .companion-helper__actions,
 .no-js .companion-helper__status {
   display: none;
 }
 
-/* ---------------------------------------------------------
-   Responsive — no horizontal overflow at 320px
-   --------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Compact widths
+   -------------------------------------------------------------------------- */
 
 @media (max-width: 480px) {
   .companion-helper__launcher {
@@ -376,27 +385,23 @@
   }
 }
 
-/* ---------------------------------------------------------
-   Motion, contrast, print
-   --------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Motion / print
+   -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .companion-helper__launcher {
+  .companion-helper__launcher,
+  .companion-helper__apply,
+  .companion-helper__arrow {
     transition: none;
   }
 
   .companion-helper__launcher:hover {
     transform: none;
   }
-
-  .companion-helper__apply,
-  .companion-helper__arrow {
-    transition: none;
-  }
 }
 
 @media print {
-  /* Interactive, not printable: printing the page prints the form only. */
   .companion-helper {
     display: none !important;
   }
