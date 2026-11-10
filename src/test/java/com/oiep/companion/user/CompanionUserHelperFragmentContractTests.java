@@ -26,6 +26,8 @@ class CompanionUserHelperFragmentContractTests {
 
     private static final List<String> MESSAGE_KEYS = List.of(
             "companion.helper.kicker",
+            "companion.helper.launcher",
+            "companion.helper.close",
             "companion.helper.title",
             "companion.helper.lead",
             "companion.helper.privacy",
@@ -51,6 +53,12 @@ class CompanionUserHelperFragmentContractTests {
         assertThat(jsp).contains("<%@ include file=\"../fragments/taglibs.jspf\" %>");
         assertThat(jsp).contains("<c:set var=\"ctx\" value=\"${pageContext.request.contextPath}\"/>");
         assertThat(jsp).contains("data-companion-helper");
+        assertThat(jsp).contains("data-companion-launcher");
+        assertThat(jsp).contains("id=\"companion-helper-panel\"");
+        assertThat(jsp).contains("role=\"dialog\"");
+        assertThat(jsp).contains("data-companion-close");
+        assertThat(jsp).contains("aria-controls=\"companion-helper-panel\"");
+        assertThat(jsp).contains("aria-expanded=\"false\"");
         assertThat(jsp).contains("<iframe");
         assertThat(jsp).contains("data-companion-widget");
         assertThat(jsp).contains("data-companion-apply");
@@ -107,6 +115,39 @@ class CompanionUserHelperFragmentContractTests {
                 .as("no inline event handlers allowed")
                 .isFalse();
         assertThat(jsp).doesNotContain("javascript:");
+    }
+
+    @Test
+    void widgetIsAFloatingLauncherWithAHiddenPanelByDefault() throws IOException {
+        String jsp = read(JSP);
+        String script = read(SCRIPT);
+        String css = read(STYLE);
+
+        // Server-rendered state: launcher collapsed, panel hidden (no-JS friendly), both
+        // controlled by a single toggle. The launcher is a real link so it still works
+        // without JavaScript (it opens the standalone widget).
+        assertThat(jsp).contains("class=\"companion-helper__launcher\"");
+        assertThat(jsp).contains("target=\"_blank\"");
+        assertThat(jsp).contains("rel=\"noopener noreferrer\"");
+        assertThat(jsp).contains("class=\"companion-helper__panel\"");
+        assertThat(jsp).contains("hidden>");
+        assertThat(jsp).contains("id=\"companion-helper-panel\"");
+
+        // Floating layout, fixed position, compact width; no rounded card chrome.
+        assertThat(css).contains(".companion-helper__launcher");
+        assertThat(css).contains(".companion-helper__panel");
+        assertThat(css).contains("position: fixed");
+        assertThat(css).contains("calc(100vw - 1.8rem)");
+        assertThat(css).contains(".companion-helper__panel[hidden]");
+        assertThat(css).doesNotContain("linear-gradient", "border-radius", "box-shadow");
+
+        // The script toggles it: aria-expanded, hidden attribute, Escape and outside click.
+        assertThat(script).contains("data-companion-launcher");
+        assertThat(script).contains("[data-companion-close]");
+        assertThat(script).contains("aria-expanded");
+        assertThat(script).contains("panel.hidden");
+        assertThat(script).contains("\"Escape\"");
+        assertThat(script).contains("closePanel");
     }
 
     @Test

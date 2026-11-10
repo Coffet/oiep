@@ -117,7 +117,7 @@ A separate, optional service — [oiep-backendAI](https://github.com/Coffet/oiep
 
 When enabled, the component adds three independent surfaces:
 
-- **User helper** — an optional chat widget on the public form page. The visitor's browser loads it directly from the companion's own origin (OIEP only adds that exact origin to the CSP `frame-src`); the widget returns a prefill payload over `postMessage` and OIEP fills the matching form fields. Nothing is submitted automatically.
+- **User helper** — an optional web-chat widget: a compact launcher fixed to the bottom-right of the public form page opens the companion's own widget in a floating panel. The visitor's browser loads it directly from the companion's origin (OIEP only adds that exact origin to the CSP `frame-src`); the widget returns a prefill payload over `postMessage` and OIEP fills the matching form fields. Nothing is submitted automatically, and without JavaScript the launcher is a plain link to the standalone widget.
 - **Read-only experiences API** — `GET /api/v1/experiences`, consumed by the companion's admin corpus sync with a dedicated read-only bearer token. Hidden/deleted notes are propagated as tombstones.
 - **Admin helper** — `/admin/assistant` inside the existing admin area, proxied server-side so the companion's operator token never reaches the browser.
 
@@ -251,7 +251,7 @@ src/main/resources/
 src/main/webapp/WEB-INF/jsp/           JSP views and shared fragments
 src/main/webapp/WEB-INF/jsp/admin/     admin login, dashboard, detail, delete pages
 src/main/webapp/WEB-INF/jsp/companion/ optional user-helper and admin-helper views
-src/test/java/com/oiep/                321 tests
+src/test/java/com/oiep/                322 tests
 ```
 
 ## Tests

@@ -1,8 +1,10 @@
 /* OIEP — optional AI companion: user-helper bridge (progressive enhancement).
  *
  * The iframe (served by the separate oiep-backendAI process) works on its own: it runs the
- * chat, reviews the draft and lets the visitor copy it. This file only adds the convenience
- * of copying a reviewed draft into the OIEP form.
+ * chat, reviews the draft and lets the visitor copy it. This file adds two conveniences:
+ *  - it turns the floating launcher into an open/close toggle for the embedded panel
+ *    (without this script the launcher is a plain link to the standalone widget), and
+ *  - it copies a reviewed draft into the OIEP form.
  *
  * Safety rules, deliberately strict:
  *  - messages are accepted only from the exact configured widget origin AND from the
@@ -442,6 +444,85 @@
     setStatus(statusForResult(result));
     if (result.changed > 0) focusFirstChanged(result.firstChanged);
   };
+
+  /* ------------------------------------------------------------------
+     Floating widget: open/close the compact panel from the launcher.
+     Progressive enhancement only — the launcher is an <a> to the standalone
+     widget until this script takes over (modified clicks still open that tab).
+     ------------------------------------------------------------------ */
+  const launcher = root.querySelector("[data-companion-launcher]");
+  const panel = root.querySelector("#companion-helper-panel");
+  const closeButton = root.querySelector("[data-companion-close]");
+  let wasFocusedBeforeOpen = null;
+
+  const setPanelOpen = (open) => {
+    if (!panel) return;
+    panel.hidden = !open;
+    root.classList.toggle("is-open", open);
+    if (launcher) launcher.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+
+  const openPanel = () => {
+    if (!panel || !panel.hidden) return;
+    wasFocusedBeforeOpen = document.activeElement;
+    setPanelOpen(true);
+    const firstFocusable = closeButton || panel;
+    if (firstFocusable && typeof firstFocusable.focus === "function") {
+      try {
+        firstFocusable.focus({ preventScroll: true });
+      } catch (ignored) {
+        try {
+          firstFocusable.focus();
+        } catch (alsoIgnored) {
+          /* keep the visitor where they are */
+        }
+      }
+    }
+  };
+
+  const closePanel = (restoreFocus) => {
+    if (!panel || panel.hidden) return;
+    setPanelOpen(false);
+    if (!restoreFocus) return;
+    const target = launcher || wasFocusedBeforeOpen;
+    if (target && typeof target.focus === "function") {
+      try {
+        target.focus({ preventScroll: true });
+      } catch (ignored) {
+        try {
+          target.focus();
+        } catch (alsoIgnored) {
+          /* keep the visitor where they are */
+        }
+      }
+    }
+  };
+
+  if (launcher && panel) {
+    launcher.addEventListener("click", (event) => {
+      // Modified clicks (new tab/window) keep the plain-link behaviour.
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      event.preventDefault();
+      if (panel.hidden) openPanel();
+      else closePanel(true);
+    });
+
+    if (closeButton) closeButton.addEventListener("click", () => closePanel(true));
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !panel.hidden) closePanel(true);
+    });
+
+    // Click outside the panel (and its launcher) closes it without stealing focus.
+    document.addEventListener("click", (event) => {
+      if (panel.hidden) return;
+      const target = event.target;
+      if (target && (panel.contains(target) || launcher.contains(target))) return;
+      closePanel(false);
+    });
+  }
 
   applyButton.addEventListener("click", requestPrefill);
   window.addEventListener("message", onWidgetMessage);

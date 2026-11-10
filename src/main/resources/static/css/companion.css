@@ -1,16 +1,91 @@
 /* =========================================================
-   OIEP — optional AI companion: user-helper section
-   Rendered after the debrief form only while the companion is enabled.
-   Design contract: quiet appendix to the form, not a second hero. Warm
-   paper, ink hairlines, one correction-red mark; no cards, gradients,
-   radius, shadows or SaaS chrome. Tokens are shared with site.css (with
+   OIEP — optional AI companion: floating user-helper widget
+   A quiet chat launcher in the bottom-right corner; it opens a compact panel that
+   embeds the companion's own widget. Design contract: same warm paper, ink
+   hairlines and single correction-red mark as the rest of the site; no gradients,
+   rounded-card chrome or drop shadows. Tokens are shared with site.css (with
    fallbacks so this file is harmless if loaded alone).
    ========================================================= */
 
 .companion-helper {
-  margin-top: clamp(4.5rem, 12vh, 8rem);
-  padding-top: 1.4rem;
-  border-top: 1px solid var(--rule-strong, rgba(17, 24, 32, 0.5));
+  position: fixed;
+  inset: auto 0 0 auto;
+  z-index: 70;
+  color: var(--ink, #111820);
+  font-family: var(--font-sans, "Instrument Sans", "Noto Sans HK", "PingFang HK", sans-serif);
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  pointer-events: none;
+}
+
+.companion-helper > * {
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------------
+   Launcher (a plain link without JavaScript, a toggle with it)
+   --------------------------------------------------------- */
+
+.companion-helper__launcher {
+  position: fixed;
+  right: clamp(0.9rem, 2.5vw, 1.6rem);
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem; /* 44px tap target */
+  max-width: min(16rem, calc(100vw - 1.8rem));
+  padding: 0.62rem 0.95rem;
+  border: 1px solid var(--ink, #111820);
+  background: var(--ink, #111820);
+  color: var(--paper-light, #faf3e3);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.09em;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease-soft, ease), color 0.2s var(--ease-soft, ease);
+}
+
+.companion-helper__launcher:hover {
+  background: var(--paper-light, #faf3e3);
+  color: var(--ink, #111820);
+}
+
+.companion-helper__launcher:focus-visible,
+.companion-helper__close:focus-visible,
+.companion-helper__apply:focus-visible {
+  outline: var(--focus, 2px solid #a92f1d);
+  outline-offset: 3px;
+}
+
+.companion-helper__bubble {
+  flex: none;
+}
+
+.companion-helper__launcher-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------
+   Panel — compact, scrolls internally on short viewports
+   --------------------------------------------------------- */
+
+.companion-helper__panel {
+  position: fixed;
+  right: clamp(0.9rem, 2.5vw, 1.6rem);
+  bottom: calc(4.55rem + env(safe-area-inset-bottom, 0px));
+  width: min(26rem, calc(100vw - 1.8rem));
+  max-height: min(85vh, 42rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--ink, #111820);
+  background: var(--paper-light, #faf3e3);
   color: var(--ink, #111820);
   font-family: var(--font-sans, "Instrument Sans", "Noto Sans HK", "PingFang HK", sans-serif);
   font-size: 1rem;
@@ -18,11 +93,47 @@
   overflow-wrap: break-word;
 }
 
-/* Optional tag next to the heading — quiet, like an editorial margin note. */
-.companion-helper__optional {
-  padding: 0.14rem 0.36rem;
-  border: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
+.companion-helper__panel[hidden] {
+  display: none;
+}
+
+.companion-helper__head {
+  position: relative;
+  padding: 0.85rem 2.85rem 0.7rem 1rem;
+  border-bottom: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
+}
+
+.companion-helper__kicker {
+  margin: 0 0 0.3rem;
   font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute, #6b675b);
+}
+
+.companion-helper__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.65rem;
+  margin: 0;
+}
+
+.companion-helper__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.companion-helper__optional {
+  padding: 0.12rem 0.32rem;
+  border: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
+  font-size: 0.5625rem;
   font-weight: 500;
   line-height: 1;
   letter-spacing: 0.12em;
@@ -30,114 +141,86 @@
   color: var(--ink-mute, #6b675b);
 }
 
-.companion-helper__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 21rem) minmax(0, 40rem);
-  align-items: start;
-  justify-content: space-between;
-  gap: clamp(2rem, 5vw, 5rem);
-  padding-top: clamp(1.3rem, 3vw, 2.1rem);
+.companion-helper__close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem; /* 44px tap target */
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink, #111820);
+  cursor: pointer;
 }
 
-.companion-helper__intro,
-.companion-helper__panel {
-  min-width: 0;
+.companion-helper__close:hover {
+  color: var(--accent, #a92f1d);
 }
 
-.companion-helper__title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.4rem 0.9rem;
-  margin: 0 0 0.85rem;
+/* Text kept for assistive technology: the dialog description and the loading hint.
+   The compact panel leads with the widget itself. */
+.companion-helper__lead,
+.companion-helper__hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
-.companion-helper__title {
-  margin: 0;
-  font-size: clamp(1.375rem, 2.1vw, 1.75rem);
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
+/* ---------------------------------------------------------
+   Widget frame — a hairline frame on the paper, nothing more
+   --------------------------------------------------------- */
 
-.companion-helper__lead {
-  max-width: 44ch;
-  margin: 0 0 1.6rem;
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  color: var(--ink-soft, #4b4a42);
-}
-
-.companion-helper__privacy {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-  max-width: 46ch;
-  margin: 0;
-  padding-top: 1.1rem;
-  border-top: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
-  font-size: 0.8125rem;
-  line-height: 1.55;
-  color: var(--ink-mute, #6b675b);
-}
-
-.companion-helper__lock {
-  flex: none;
-  margin-top: 0.15rem;
-  color: var(--ink-mute, #6b675b);
-}
-
-/* The widget sheet: a hairline frame on the paper, nothing more. */
 .companion-helper__frame {
+  margin: 0.7rem 1rem 0;
   border: 1px solid var(--rule-strong, rgba(17, 24, 32, 0.5));
-  background: var(--paper-light, #faf3e3);
+  background: var(--paper, #f5ebd5);
 }
 
 .companion-helper__iframe {
   display: block;
   width: 100%;
-  height: clamp(26rem, 66vh, 40rem);
+  height: clamp(15rem, 46vh, 23rem);
   border: 0;
-  background: var(--paper-light, #faf3e3);
-}
-
-.companion-helper__hint {
-  margin: 0.7rem 0 0;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--ink-mute, #6b675b);
+  background: var(--paper, #f5ebd5);
 }
 
 .companion-helper__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem 1.25rem;
-  margin-top: 1.35rem;
+  gap: 0.6rem 1rem;
+  margin: 0.75rem 1rem 0;
 }
 
 .companion-helper__apply {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.75rem;
+  gap: 1.25rem;
+  flex: 0 1 auto;
   min-height: 2.75rem; /* 44px tap target */
-  padding: 0.7rem 1rem;
+  padding: 0.6rem 0.8rem;
   border: 1px solid var(--ink, #111820);
   background: transparent;
   color: var(--ink, #111820);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   line-height: 1.25;
   text-align: left;
   cursor: pointer;
   transition: background-color 0.2s var(--ease-soft, ease),
     border-color 0.2s var(--ease-soft, ease), color 0.2s var(--ease-soft, ease);
-}
-
-.companion-helper .eyebrow {
-  color: var(--ink-mute, #6b675b);
 }
 
 .companion-helper__apply:not([disabled]):hover {
@@ -148,11 +231,6 @@
 
 .companion-helper__apply:active {
   transform: translateY(1px);
-}
-
-.companion-helper__apply:focus-visible {
-  outline: var(--focus, 2px solid #a92f1d);
-  outline-offset: 4px;
 }
 
 .companion-helper__apply[disabled] {
@@ -174,73 +252,84 @@
 }
 
 .companion-helper__note {
-  flex: 1 1 12rem;
+  flex: 1 1 10rem;
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   color: var(--ink-mute, #6b675b);
 }
 
-/* Status: reserved line (no layout jump when it fills). The correction-red
-   mark appears only once there is something to review. */
+/* Status: reserved line (no layout jump when it fills). The correction-red mark
+   appears only once there is something to review. */
 .companion-helper__status {
-  min-height: 1.5em;
-  margin: 1rem 0 0;
-  font-size: 0.875rem;
-  line-height: 1.55;
+  min-height: 1.4em;
+  margin: 0.55rem 1rem 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
   color: var(--ink, #111820);
 }
 
 .companion-helper__status:not(:empty) {
-  padding-left: 0.75rem;
+  padding-left: 0.7rem;
   border-left: 2px solid var(--accent, #a92f1d);
 }
 
 .companion-helper__fallback {
-  margin: 0.7rem 0 0;
-  font-size: 0.8125rem;
-  line-height: 1.55;
+  margin: 0.45rem 1rem 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
   color: var(--ink-soft, #4b4a42);
 }
 
-/* Without JavaScript the iframe still works; hide the bridge-only controls. */
+.companion-helper__privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0.6rem 1rem 0.85rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  color: var(--ink-mute, #6b675b);
+}
+
+.companion-helper__privacy > span {
+  min-width: 0;
+}
+
+.companion-helper__lock {
+  flex: none;
+  margin-top: 0.1rem;
+  color: var(--ink-mute, #6b675b);
+}
+
+/* Without JavaScript the launcher is a normal link to the standalone widget;
+   the panel and the bridge-only controls stay out of the way. */
+.no-js .companion-helper__panel,
 .no-js .companion-helper__actions,
 .no-js .companion-helper__status {
   display: none;
 }
 
-/* =========================================================
-   Responsive — single column, no horizontal overflow at 320px
-   ========================================================= */
+/* ---------------------------------------------------------
+   Responsive — no horizontal overflow at 320px
+   --------------------------------------------------------- */
 
-@media (max-width: 1024px) {
-  .companion-helper__grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1.75rem;
+@media (max-width: 480px) {
+  .companion-helper__launcher {
+    right: 0.7rem;
+    max-width: calc(100vw - 1.4rem);
   }
 
-  .companion-helper__lead {
-    max-width: 58ch;
-    margin-bottom: 1.2rem;
-  }
-
-  .companion-helper__privacy {
-    max-width: 58ch;
+  .companion-helper__panel {
+    right: 0.7rem;
+    left: 0.7rem;
+    width: auto;
+    max-height: 82vh;
   }
 
   .companion-helper__iframe {
-    height: clamp(24rem, 62vh, 34rem);
-  }
-}
-
-@media (max-width: 480px) {
-  .companion-helper {
-    margin-top: 3.5rem;
-    font-size: 0.9375rem;
-  }
-
-  .companion-helper__grid {
-    padding-top: 1.1rem;
+    height: clamp(14rem, 42vh, 20rem);
   }
 
   .companion-helper__apply {
@@ -250,17 +339,14 @@
   .companion-helper__note {
     flex-basis: 100%;
   }
-
-  .companion-helper__iframe {
-    height: clamp(22rem, 58vh, 30rem);
-  }
 }
 
-/* =========================================================
+/* ---------------------------------------------------------
    Motion, contrast, print
-   ========================================================= */
+   --------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
+  .companion-helper__launcher,
   .companion-helper__apply,
   .companion-helper__arrow {
     transition: none;
@@ -268,7 +354,7 @@
 }
 
 @media print {
-  /* The widget is interactive, not printable: printing the page prints the form only. */
+  /* Interactive, not printable: printing the page prints the form only. */
   .companion-helper {
     display: none !important;
   }

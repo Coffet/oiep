@@ -44,7 +44,7 @@ route, no page fragment, no CSP change), and the startup log says why.
 
 | Surface | Where | Master switch + sub-switch | Default | Requires |
 | --- | --- | --- | --- | --- |
-| **User helper** | Optional chat widget on the public form page (`/`) | `OIEP_COMPANION_ENABLED` + `OIEP_COMPANION_USER_HELPER_ENABLED` | master off; user helper on *within* the enabled component | a browser-reachable companion **widget URL** |
+| **User helper** | Floating chat launcher (bottom-right) on the public form page (`/`) that opens the companion widget in a compact panel | `OIEP_COMPANION_ENABLED` + `OIEP_COMPANION_USER_HELPER_ENABLED` | master off; user helper on *within* the enabled component | a browser-reachable companion **widget URL** |
 | **Read-only experiences API** | `GET /api/v1/experiences` for the companion's admin corpus sync | + `OIEP_COMPANION_READ_API_ENABLED` | off | a read-only bearer token (`OIEP_COMPANION_READ_TOKEN`) |
 | **Operator admin helper** | `GET /admin/assistant` in the existing admin area, server-side proxy to `/v1/admin/*` | + `OIEP_COMPANION_ADMIN_HELPER_ENABLED` | off | companion base URL + operator bearer token (`OIEP_COMPANION_ADMIN_TOKEN`) |
 
@@ -98,12 +98,17 @@ Consequences worth remembering:
 
 ### User-helper bridge (postMessage)
 
-The iframe is a complete widget on its own; OIEP only adds two progressive enhancements:
+The iframe is a complete widget on its own; OIEP adds three progressive enhancements around it:
 
-1. **Embed** — the page includes the configured widget URL in a sandboxed iframe
+1. **Launcher + panel** — instead of taking over a page section, the helper is a compact
+   web-chat launcher fixed to the bottom-right corner. Clicking it opens a small floating panel
+   (dialog) containing the configured widget URL in a sandboxed iframe
    (`allow-scripts allow-forms allow-same-origin`, `loading="lazy"`,
    `referrerpolicy="no-referrer"`). The visitor chats inside the frame; OIEP sees no messages.
-2. **Prefill** — a "Use the helper's answers" button on the OIEP page asks the widget for the
+   Escape or the close button collapses the panel again. **Without JavaScript** the launcher is a
+   plain link that opens the same standalone widget (`/ui/`) in a new tab, and the panel stays
+   out of the way.
+2. **Prefill** — a "Use the helper's answers" button in the panel asks the widget for the
    reviewed draft and fills matching form fields. The hand-off is an origin-checked
    `postMessage` conversation:
 
@@ -182,7 +187,7 @@ Values copied verbatim from this document or `.env.example` as tokens are detect
 | --- | --- | --- | --- | --- |
 | `oiep.companion.enabled` | `OIEP_COMPANION_ENABLED` | `false` | master switch; `false` = component completely inert | — |
 | `oiep.companion.base-url` | `OIEP_COMPANION_BASE_URL` | *(empty)* | companion **origin** used by the OIEP server (plain origin, optional trailing `/`, no path/query); `http(s)://host[:port]` | `OIEP_AI_PUBLIC_BASE_URL` (informational) |
-| `oiep.companion.user-helper.enabled` | `OIEP_COMPANION_USER_HELPER_ENABLED` | `true` | render the widget block on the public form page | — |
+| `oiep.companion.user-helper.enabled` | `OIEP_COMPANION_USER_HELPER_ENABLED` | `true` | render the floating launcher on the public form page | — |
 | `oiep.companion.user-helper.widget-url` | `OIEP_COMPANION_WIDGET_URL` | `<base-url>/ui/` | full browser-visible iframe URL; its **origin** becomes the CSP `frame-src` entry | — (served at `/ui/` when `OIEP_AI_UI_ENABLED=true`) |
 | `oiep.companion.admin-helper.enabled` | `OIEP_COMPANION_ADMIN_HELPER_ENABLED` | `false` | expose `/admin/assistant` and its same-origin proxy | — |
 | `oiep.companion.admin-helper.token` | `OIEP_COMPANION_ADMIN_TOKEN` | *(empty)* | companion operator bearer token; server-side only | `OIEP_AI_ADMIN_TOKEN` |
@@ -290,7 +295,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8090 --workers 1
 | Check | How | Expected |
 | --- | --- | --- |
 | Component is wired | the OIEP startup log | `AI companion component enabled: … userHelper=true adminHelper=true readApi=true` |
-| User helper | open <http://localhost:8080/> and look under the form | the optional helper block with an embedded widget |
+| User helper | open <http://localhost:8080/> and click the floating "Form helper" launcher at the bottom-right | the launcher opens the widget panel; Escape/close collapses it |
 | CSP | `curl -sI http://localhost:8080/` | `frame-src 'self' http://127.0.0.1:8090` in `Content-Security-Policy` |
 | Admin helper | sign in at `/admin` and open `/admin/assistant` | status card loads when the companion is up |
 | Read API | the curl below | `{"items":[...],"next_cursor":…,"has_more":false}` |

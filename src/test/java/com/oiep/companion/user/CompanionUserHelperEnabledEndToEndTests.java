@@ -54,6 +54,8 @@ class CompanionUserHelperEnabledEndToEndTests {
     void everyHelperMessageExistsInBothBundles() {
         List<String> keys = List.of(
                 "companion.helper.kicker",
+                "companion.helper.launcher",
+                "companion.helper.close",
                 "companion.helper.title",
                 "companion.helper.lead",
                 "companion.helper.privacy",
@@ -109,6 +111,15 @@ class CompanionUserHelperEnabledEndToEndTests {
 
         assertThat(html).contains("data-companion-helper");
         assertThat(html).contains("src=\"" + WIDGET_URL + "\"");
+        // Floating web-chat widget: collapsed launcher (a real link to the standalone widget)
+        // plus an initially hidden dialog panel with the embedded widget.
+        assertThat(html).contains("data-companion-launcher");
+        assertThat(html).contains("aria-expanded=\"false\"");
+        assertThat(html).contains("aria-controls=\"companion-helper-panel\"");
+        assertThat(html).contains("id=\"companion-helper-panel\"");
+        assertThat(html).contains("role=\"dialog\"");
+        assertThat(html).contains("data-companion-close");
+        assertThat(html).contains("Form helper");
         assertThat(html).contains("loading=\"lazy\"");
         assertThat(html).contains("referrerpolicy=\"no-referrer\"");
         assertThat(html).contains("sandbox=\"allow-scripts allow-forms allow-same-origin\"");
@@ -145,6 +156,7 @@ class CompanionUserHelperEnabledEndToEndTests {
         assertThat(response.statusCode()).isEqualTo(200);
         String html = response.body();
         assertThat(html).contains("對著空白格不知道點寫？");
+        assertThat(html).contains("填表小幫手");
         assertThat(html).contains("把小幫手的答案填入表格");
         assertThat(html).contains("data-msg-applied-count");
         assertThat(html).doesNotContain("${", "<spring:message", "<c:out");
