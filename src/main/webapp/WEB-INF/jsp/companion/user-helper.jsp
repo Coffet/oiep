@@ -37,7 +37,7 @@
   <spring:message code="companion.helper.skipped" var="msgSkipped"/>
   <spring:message code="companion.helper.notReady" var="msgNotReady"/>
   <spring:message code="companion.helper.unavailable" var="msgUnavailable"/>
-  <link rel="stylesheet" href="${ctx}/css/companion.css">
+  <link rel="stylesheet" href="${ctx}/css/companion.css?v=20261111a">
   <div class="companion-helper" data-companion-helper
       data-widget-origin="${fn:escapeXml(helper.widgetOrigin)}"
       data-msg-launcher="${fn:escapeXml(msgLauncher)}"
@@ -122,5 +122,5 @@
       </div>
     </div>
   </div>
-  <script src="${ctx}/js/companion.js" defer></script>
+  <script src="${ctx}/js/companion.js?v=20261111a" defer></script>
 </c:if>

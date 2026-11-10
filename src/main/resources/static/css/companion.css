@@ -30,13 +30,13 @@
 
 .companion-helper__launcher {
   position: fixed;
-  right: clamp(0.9rem, 2.5vw, 1.6rem);
-  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  right: clamp(1rem, 2.5vw, 1.75rem);
+  bottom: calc(1.15rem + env(safe-area-inset-bottom, 0px));
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 3.5rem;
-  height: 3.5rem; /* 56px tap target */
+  width: 3.75rem;
+  height: 3.75rem; /* 60px tap target */
   min-height: 2.75rem;
   padding: 0;
   border: 1px solid var(--ink, #111820);
@@ -44,7 +44,7 @@
   background: var(--ink, #111820);
   color: var(--paper-light, #faf3e3);
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(17, 24, 32, 0.24);
+  box-shadow: 0 12px 30px rgba(17, 24, 32, 0.28);
   transition: background-color 0.2s var(--ease-soft, ease), color 0.2s var(--ease-soft, ease),
     transform 0.2s var(--ease-out, ease);
 }
@@ -86,22 +86,22 @@
 
 .companion-helper__panel {
   position: fixed;
-  right: clamp(0.9rem, 2.5vw, 1.6rem);
-  bottom: calc(4.9rem + env(safe-area-inset-bottom, 0px));
+  right: clamp(1rem, 2.5vw, 1.75rem);
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  width: min(24rem, calc(100vw - 1.8rem));
-  height: min(34rem, 72vh);
+  width: min(30rem, calc(100vw - 2rem));
+  height: min(46rem, 86vh);
   overflow: hidden;
   border: 1px solid var(--ink, #111820);
-  border-radius: 0.7rem;
+  border-radius: 0.9rem;
   background: var(--paper-light, #faf3e3);
   color: var(--ink, #111820);
   font-family: var(--font-sans, "Instrument Sans", "Noto Sans HK", "PingFang HK", sans-serif);
   font-size: 1rem;
   line-height: 1.5;
   overflow-wrap: break-word;
-  box-shadow: 0 18px 48px rgba(17, 24, 32, 0.28);
+  box-shadow: 0 28px 70px rgba(17, 24, 32, 0.34);
 }
 
 .companion-helper__panel[hidden] {
@@ -112,9 +112,9 @@
 .companion-helper__head {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.75rem;
   flex: none;
-  padding: 0.65rem 0.5rem 0.65rem 0.85rem;
+  padding: 0.8rem 0.55rem 0.8rem 1.05rem;
   background: var(--ink, #111820);
   color: var(--paper-light, #faf3e3);
 }
@@ -124,8 +124,8 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border: 1px solid rgba(250, 243, 227, 0.4);
   border-radius: 50%;
   color: var(--paper-light, #faf3e3);
@@ -134,13 +134,13 @@
 .companion-helper__headtext {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.12rem;
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .companion-helper__title {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -152,7 +152,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1.2;
   color: rgba(250, 243, 227, 0.72);
 }
@@ -230,9 +230,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.3rem 0.75rem;
+  gap: 0.4rem 0.9rem;
   flex: none;
-  padding: 0.55rem 0.75rem 0.65rem;
+  padding: 0.8rem 1.1rem 0.9rem;
   border-top: 1px solid var(--rule, rgba(17, 24, 32, 0.22));
   background: var(--paper-light, #faf3e3);
 }
@@ -242,15 +242,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  flex: 0 1 auto;
+  flex: 1 1 100%;
   min-height: 2.75rem; /* 44px tap target */
-  padding: 0.55rem 0.75rem;
+  padding: 0.7rem 0.95rem;
   border: 1px solid var(--ink, #111820);
-  border-radius: 0.25rem;
+  border-radius: 0.35rem;
   background: transparent;
   color: var(--ink, #111820);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   line-height: 1.25;
   text-align: left;
   cursor: pointer;
@@ -287,9 +287,9 @@
 }
 
 .companion-helper__note {
-  flex: 1 1 9rem;
-  margin: 0;
-  font-size: 0.6875rem;
+  flex: 1 1 auto;
+  margin: 0.1rem 0 0;
+  font-size: 0.75rem;
   line-height: 1.4;
   color: var(--ink-mute, #6b675b);
 }
@@ -332,20 +332,20 @@
 
 @media (max-width: 480px) {
   .companion-helper__launcher {
-    right: 0.75rem;
-    bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    right: 0.9rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   }
 
   .companion-helper__panel {
-    right: 0.5rem;
-    left: 0.5rem;
+    right: 0.6rem;
+    left: 0.6rem;
     width: auto;
-    height: min(34rem, 80vh);
-    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    height: min(42rem, 88vh);
+    bottom: calc(5.15rem + env(safe-area-inset-bottom, 0px));
   }
 
   .companion-helper__apply {
-    flex: 1 1 auto;
+    flex: 1 1 100%;
   }
 
   .companion-helper__note {
