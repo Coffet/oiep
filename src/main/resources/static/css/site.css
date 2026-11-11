@@ -92,8 +92,8 @@ body::before {
 
 ::selection {
   /* A soft accent wash rather than a solid red block. */
-  background: rgba(169, 47, 29, 0.16);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  background-color: rgba(169, 47, 29, 0.3);
+  background-color: color-mix(in srgb, var(--accent) 30%, transparent);
   color: var(--ink);
 }
 
