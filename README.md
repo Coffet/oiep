@@ -61,6 +61,9 @@ Requirements: **JDK 17+**. Maven is not required; the Maven wrapper is included.
 
 Then open [http://localhost:8080](http://localhost:8080).
 
+For the full local matrix — Docker or bare metal, with the optional AI companion and its local LLM
+on or off — see **[docs/LOCAL-RUN.md](docs/LOCAL-RUN.md)**.
+
 The SQLite database is created automatically at `data/oiep.db` (WAL mode). To use another location, set `OIEP_DB_PATH` or override the datasource URL:
 
 ```bash
@@ -401,6 +404,7 @@ scripts/companion-uninstall.sql        drops the optional companion's read-API t
 docs/DEPLOY.md                         hand-holding deployment guide
 docs/COMPANION.md                      optional AI companion reference, config and add/remove procedure
 docs/COMPANION-VERIFICATION.md         independent verification report (incl. clean-removal simulation)
+docs/LOCAL-RUN.md                      local boot matrix: Docker/bare metal, companion/LLM on or off
 src/main/java/com/oiep/
   companion/                           optional AI companion component: user helper, admin proxy, read API
   config/                              JDBC/SQLite + locale + CSP configuration

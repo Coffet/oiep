@@ -76,6 +76,7 @@ Rough running cost: a small VPS is usually US$5–10/month (a Raspberry Pi at ho
 | `scripts/companion-uninstall.sql` | Optional AI companion removal step: drops the read-API's SQLite triggers/table. Only needed if you enabled the companion and are removing it again. |
 | `docs/DEPLOY.md` | This file. |
 | `docs/COMPANION.md` | Optional AI companion reference: what it adds, configuration, tokens, read API, privacy and the add/remove procedure. |
+| `docs/LOCAL-RUN.md` | Local boot matrix: OIEP in Docker or bare metal, with the optional companion and its local LLM (Ollama) on or off. |
 
 ### Optional AI companion (oiep-backendAI)
 

@@ -254,7 +254,8 @@ character IP-hash salt when `OIEP_AI_ENV=prod`.
 ## Quick start (local)
 
 The companion runs as a separate process. It needs Python 3.11+ (or Docker) and roughly
-150 MB of RAM; no GPU and no cloud LLM.
+150 MB of RAM; no GPU and no cloud LLM. For the optional local model (Ollama) and the
+Docker/bare-metal boot matrix, see [LOCAL-RUN.md](LOCAL-RUN.md).
 
 ### 1. Start the companion
 
