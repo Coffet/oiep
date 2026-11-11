@@ -102,10 +102,14 @@ ollama pull qwen2.5:1.5b-instruct-q4_K_M
 **Point the app at the host companion** — in `.env`:
 
 ```dotenv
-OIEP_COMPANION_BASE_URL=http://host.docker.internal:8090
+OIEP_COMPANION_BASE_URL=http://host.docker.internal:8091
+OIEP_COMPANION_WIDGET_URL=http://127.0.0.1:8091/ui/
 ```
 
-(`host.docker.internal` is resolved automatically by Docker Desktop. On Linux Docker add
+Use host port **8091** (not 8090) for the source companion: the Docker overlay publishes the
+containerised `ai` on `127.0.0.1:8090`, so a different host port lets the two coexist and keeps
+`docker compose up` working while the LLM is enabled. (`host.docker.internal` is resolved
+automatically by Docker Desktop. On Linux Docker add
 `extra_hosts: ["host.docker.internal:host-gateway"]` to the `app` service, bind the companion with
 `OIEP_AI_HOST=0.0.0.0` behind the host firewall — or front it with a reverse proxy — and review
 [SECURITY.md](https://github.com/Coffet/oiep-backendAI/blob/main/docs/SECURITY.md).)
@@ -119,6 +123,9 @@ $env:OIEP_AI_ENV = "prod"
 $env:OIEP_AI_ADMIN_TOKEN = "<same value as OIEP_COMPANION_ADMIN_TOKEN>"
 $env:OIEP_AI_IP_HASH_SALT = "<same value as OIEP_AI_IP_HASH_SALT>"
 $env:OIEP_AI_WIDGET_PARENT_ORIGINS = "http://127.0.0.1:8080,http://localhost:8080"
+$env:OIEP_AI_HOST = "127.0.0.1"
+$env:OIEP_AI_PORT = "8091"
+$env:OIEP_AI_PUBLIC_BASE_URL = "http://127.0.0.1:8091"
 $env:OIEP_AI_MODEL_BACKEND = "ollama"
 $env:OIEP_AI_LLM_URL = "http://127.0.0.1:11434"
 $env:OIEP_AI_LLM_MODEL = "qwen2.5:1.5b-instruct-q4_K_M"
@@ -126,24 +133,30 @@ $env:OIEP_AI_LLM_TIMEOUT_MS = "20000"
 $env:OIEP_AI_LLM_NUM_CTX = "4096"
 $env:OIEP_AI_LLM_NUM_PREDICT = "1024"
 $env:OIEP_AI_LLM_PHRASE_QUESTIONS = "true"
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8090 --workers 1
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8091 --workers 1
 ```
 
 On macOS/Linux use `export NAME=value` instead of `$env:NAME = "value"` and
 `.venv/bin/python -m uvicorn ...`.
 
-**Switch the stack to the host companion** — the containerised `ai` service must be stopped (it
-would hold port 8090), then recreate the app so it picks up the new base URL:
+**Recreate the app** so it picks up the new URLs (optional: bring the rest of the stack up too):
 
 ```bash
-docker compose -f compose.yaml -f compose.companion.yaml stop ai
-docker compose -f compose.yaml -f compose.companion.yaml up -d --no-deps --force-recreate app
+docker compose -f compose.yaml -f compose.companion.yaml up -d --force-recreate app
+docker compose -f compose.yaml -f compose.companion.yaml up -d
 ```
 
-While this hybrid is active, do **not** start the `ai` service (`... up -d --no-deps app` for
-app-only restarts). To go back to §2.2: stop the source companion and Ollama, restore
-`OIEP_COMPANION_BASE_URL=http://ai:8090`, then
-`docker compose -f compose.yaml -f compose.companion.yaml up -d --force-recreate ai app`.
+The containerised `ai` keeps `:8090` with the extractive backend and is simply unused while the
+app points at the host companion on `:8091`; leaving it running keeps the normal `docker compose`
+commands working.
+
+> Do **not** export the `OIEP_AI_*` variables and then run `docker compose` from the same shell:
+> compose interpolates `${OIEP_AI_*}` from the environment, so the containerised `ai` would
+> inherit the LLM settings. Use a fresh shell for compose runs.
+
+To go back to §2.2: stop the source companion and Ollama, set
+`OIEP_COMPANION_BASE_URL=http://ai:8090` and `OIEP_COMPANION_WIDGET_URL=http://127.0.0.1:8090/ui/`,
+then `docker compose -f compose.yaml -f compose.companion.yaml up -d --force-recreate ai app`.
 
 ---
 
