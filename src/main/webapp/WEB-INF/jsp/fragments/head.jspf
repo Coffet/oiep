@@ -13,6 +13,8 @@
 <link rel="preload" href="${ctx}/fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
 <style>html{background:#F5EBD5;color:#111820}body{margin:0}</style>
 <script>document.documentElement.classList.replace('no-js','js');</script>
-<link rel="stylesheet" href="${ctx}/css/site.css">
-<c:if test="${adminCss}"><link rel="stylesheet" href="${ctx}/css/admin.css"></c:if>
-<script src="${ctx}/js/site.js" defer></script>
+<!-- Cache-busted asset URLs: bump the version when site.css/site.js/admin.css change so
+     browsers never keep a stale stylesheet after an update (the widget assets already do this). -->
+<link rel="stylesheet" href="${ctx}/css/site.css?v=20261112d">
+<c:if test="${adminCss}"><link rel="stylesheet" href="${ctx}/css/admin.css?v=20261112d"></c:if>
+<script src="${ctx}/js/site.js?v=20261112d" defer></script>
