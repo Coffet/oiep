@@ -142,7 +142,14 @@ link that opens the standalone widget (`/ui/`) in a new tab, and the overlay sta
 visitor's browser loads the widget directly from the companion's origin, and OIEP adds **exactly
 that origin** to the CSP `frame-src` (never a wildcard). The prefill hand-off is an origin-checked
 `postMessage` conversation; it only fills empty fields, never overwrites answers and **never
-submits**. Every string is bilingual (English + human-written zh-HK).
+submits**. The questions are reviewed form-field prompts: the dialogue engine decides which field
+is asked next and the visitor normally sees the reviewed template wording. With the companion's
+optional local model active (`OIEP_AI_MODEL_BACKEND=ollama`, not included in the Docker overlay)
+and `OIEP_AI_LLM_PHRASE_QUESTIONS` at its default `true`, the model may phrase the next question
+conversationally using only the field, its template question, its options and a few draft answers;
+the wording is validated, any failure falls back to the reviewed template, and OIEP still only
+embeds the widget — it sends no prompts and sees no model output beyond the question text the
+visitor sees. Every string is bilingual (English + human-written zh-HK).
 
 **Admin helper.** `/admin/assistant` is protected by the normal admin session; mutations require the
 per-session CSRF token, and the companion bearer token never reaches the browser. Only fixed

@@ -57,6 +57,18 @@ What the component deliberately does **not** do:
 - No new dependency: the admin proxy uses the JDK `java.net.http` client, the user helper uses
   one vanilla JavaScript file and the read API uses the existing SQLite/Jackson stack.
 
+Conversational question phrasing is an optional companion-side refinement, not an OIEP feature.
+When the companion runs its optional local model (`OIEP_AI_MODEL_BACKEND=ollama`; not part of the
+Docker overlay), the model may reword the **next** reviewed form question in its own words, using
+only the field, its reviewed template question, its options and a few draft values (for example the
+company name). The dialogue engine still decides *which* field is asked; the wording is validated
+(one question, 5–200 characters, ending with `?`, with no links, markdown, email addresses or
+interview/coding-question content) and any failure falls back to the reviewed template text. The
+default `extractive` backend always uses the fixed templates, and `OIEP_AI_LLM_PHRASE_QUESTIONS`
+(default `true`, `ollama` backend only) switches the phrasing on or off. OIEP itself only embeds
+the widget: it sends no prompts and sees no model output beyond the question text the widget
+displays.
+
 ---
 
 ## Architecture and trust boundaries
@@ -216,6 +228,8 @@ The matching companion-side settings you will actually set (see the companion's
 | `OIEP_AI_OIEP_EXPERIENCES_PATH` | `/api/v1/experiences` | the read API path |
 | `OIEP_AI_SYNC_ENABLED` | `false` | background sync; the operator can always trigger a sync from `/admin/assistant` |
 | `OIEP_AI_UI_ENABLED` | `true` | serve the widget at `/ui/` |
+| `OIEP_AI_MODEL_BACKEND` | `extractive` | `extractive` = deterministic grammar extractor with no model weights (the overlay default); `ollama` = optional local model over loopback, **not** included in the Docker overlay |
+| `OIEP_AI_LLM_PHRASE_QUESTIONS` | `true` | `ollama` only: let the model reword the next reviewed form question; the output is validated and any failure falls back to the reviewed template. No effect with the `extractive` backend |
 | `OIEP_AI_CORS_ORIGINS` | *(empty)* | only needed if the widget is hosted off-origin; the iframe embed does **not** need CORS |
 | `OIEP_AI_WIDGET_PARENT_ORIGINS` | *(empty)* | comma-separated browser origin(s) allowed to embed `/ui/` (the public OIEP origin, e.g. `https://oiep.example`). When set: CSP `frame-ancestors` + the widget answers the prefill `postMessage` hand-off only to those origins. When empty the hand-off is disabled (fail closed) and a production warning is logged |
 | `OIEP_AI_TRUSTED_PROXIES` | *(empty in the overlay)* | proxy networks whose `X-Forwarded-For` / `CF-Connecting-IP` headers are trusted. Never use broad RFC1918 ranges or `127.0.0.1`: any process/container that can reach the port could forge the rate-limit and audit identity. For Cloudflare Tunnel set the exact cloudflared address/subnet |
@@ -905,6 +919,7 @@ trivial. Removing them is optional; if you do, also revert `WebConfig`'s CSP met
 | Startup log has no `AI companion component enabled` line | `OIEP_COMPANION_ENABLED` is not `true` (or the app was not restarted). |
 | Widget iframe is blank / browser console says "Refused to frame" | CSP `frame-src` is missing → widget URL invalid, or the companion proxy sends `X-Frame-Options`/`frame-ancestors` without your OIEP origin. Check the response headers of the widget URL; if you use the companion's reference nginx, add your OIEP origin to `frame-ancestors`. |
 | Widget block renders but the frame cannot connect | `OIEP_COMPANION_WIDGET_URL` is `http://` while OIEP runs on HTTPS (mixed content), or the URL points at an internal Docker name (`http://ai:8090`) that the browser cannot resolve. Use a public HTTPS widget URL. |
+| Widget still shows the reviewed template questions although the local model is configured | Phrasing requires the companion's `ollama` backend: check the `/admin/assistant` status card (or the companion's `GET /v1/admin/health`) shows `ollama` and a non-degraded model — after repeated local-model failures the companion opens a circuit breaker and serves templates until it recovers. Also confirm `OIEP_AI_LLM_PHRASE_QUESTIONS` is not `false`. Finally, model wording that fails validation (one question, 5–200 characters, ending with `?`, no links/markdown/emails or interview/coding-question content) is discarded silently: the reviewed template is the documented fallback, so an occasional template question is expected rather than a bug. |
 | `/admin/assistant` is 404 after enabling | The admin-helper condition failed: `OIEP_COMPANION_ADMIN_HELPER_ENABLED` is false, `OIEP_COMPANION_BASE_URL` is not a plain origin, or the token is empty/short/a documented placeholder. The startup log prints the reason (never the token). |
 | Admin helper shows "The helper service could not be reached" (502) | OIEP cannot reach the companion at `OIEP_COMPANION_BASE_URL` (container name/port, companion down, timeout), the companion answered 5xx/redirect, or the companion rejected the token (mapped to `502 companion_auth_failed`). Check `docker compose ps`, the companion `/readyz`, and that `OIEP_COMPANION_ADMIN_TOKEN` equals `OIEP_AI_ADMIN_TOKEN`. |
 | Token "rejected"/sub-feature stays disabled | The value is a documented placeholder or shorter than 16 characters. Generate a real token. |
@@ -941,9 +956,11 @@ trivial. Removing them is optional; if you do, also revert `WebConfig`'s CSP met
   `/css/companion*.css`) are still served by Spring Boot — unreferenced and harmless. Delete them
   via the full-removal procedure if you want them gone.
 - **Companion-side features are the companion's responsibility:** the optional local LLM
-  (`OIEP_AI_MODEL_BACKEND=ollama`) and its memory budget, rate limits, consent strings, audit log
+  (`OIEP_AI_MODEL_BACKEND=ollama`), the conversational question phrasing it enables
+  (`OIEP_AI_LLM_PHRASE_QUESTIONS`), and its memory budget, rate limits, consent strings, audit log
   and privacy notice all live in the companion repository. The Docker overlay runs the default
-  extractive backend; use the companion's own deployment files for the optional local model.
+  extractive backend (fixed reviewed templates); use the companion's own deployment files for the
+  optional local model.
 - **Tokens are static shared secrets.** There is no OAuth/mTLS between the two services; rotate
   both sides together, restart both, and keep the tokens in an environment/secret file, not in the
   repository.
