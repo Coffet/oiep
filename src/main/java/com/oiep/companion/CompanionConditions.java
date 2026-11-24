@@ -57,9 +57,10 @@ public final class CompanionConditions {
             if (!Boolean.parseBoolean(property(context, "oiep.companion.admin-helper.enabled", "false"))) {
                 return false;
             }
-            String origin = CompanionSettingsSupport.serviceOrigin(
-                    property(context, "oiep.companion.base-url", ""));
-            if (origin.isEmpty()) {
+            if (!CompanionSettingsSupport.adminTransportAllowed(
+                    property(context, "oiep.companion.base-url", ""),
+                    Boolean.parseBoolean(property(context,
+                            "oiep.companion.admin-helper.allow-insecure-http", "false")))) {
                 return false;
             }
             return CompanionSettingsSupport.isUsableSecret(

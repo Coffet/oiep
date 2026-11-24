@@ -18,6 +18,11 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Same Java4Shell (CVE-2026-114938) interim mitigation as the runtime image: GitHub runners
+    # can be AVX-512 VBMI hosts. The tests do not feed untrusted Base64 to the decoder, but every
+    # JVM in the pipeline is kept on the same footing as production.
+    env:
+      JAVA_TOOL_OPTIONS: "-XX:-UseBASE64Intrinsics"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -60,6 +65,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Throw-away bearer token for the read-API probe below; it only exists inside this job.
+    env:
+      CI_READ_TOKEN: ci-read-token-4f1c2d3b5a6e7f8091a2b3c4d5e6f708
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -92,6 +100,9 @@ jobs:
             -e OIEP_SESSION_COOKIE_SECURE=true \
             -e OIEP_ADMIN_USERNAME=ci-admin \
             -e OIEP_ADMIN_PASSWORD=ci-smoke-test-only-9f3a2b1c \
+            -e OIEP_COMPANION_ENABLED=true \
+            -e OIEP_COMPANION_READ_API_ENABLED=true \
+            -e OIEP_COMPANION_READ_TOKEN="$CI_READ_TOKEN" \
             oiep:ci
 
       - name: Wait for the public page
@@ -143,6 +154,61 @@ jobs:
           grep -qi '^set-cookie: JSESSIONID=.*SameSite=Lax' login-headers.txt
 
           echo "Security header, redirect and cookie assertions passed."
+
+      - name: Check Java4Shell (CVE-2026-114938) mitigation
+        run: |
+          set -eu
+          base=http://127.0.0.1:18080
+
+          # 1) The runtime JVM must disable the vulnerable AVX-512 Base64 intrinsic. Assert the
+          #    flag origin, not just the effective value: on a CI runner whose CPU never takes
+          #    the intrinsic path the flag already defaults to false, so only the origin proves
+          #    the mitigation is configured for AVX-512 production hosts. A flag supplied through
+          #    JAVA_TOOL_OPTIONS is reported as "{environment}"; both accepted forms are checked.
+          flags="$(docker exec oiep-ci java -XX:+PrintFlagsFinal -version 2>/dev/null)"
+          printf '%s\n' "$flags" | grep -E 'UseBASE64Intrinsics' | grep -qE '\{(command line|environment)\}'
+          docker exec oiep-ci printenv JAVA_TOOL_OPTIONS | grep -q -- '-XX:-UseBASE64Intrinsics'
+
+          # 2) The read API must reject a cursor shaped like the JDK 17 Java4Shell trigger
+          #    (128 x 'A' + '=') before any Base64 decode: clean 400 invalid_cursor, no crash.
+          cursor="$(printf 'A%.0s' $(seq 1 128))="
+          status=$(curl -sS -o cursor-body.json -w '%{http_code}' -G \
+            --data-urlencode "cursor=$cursor" \
+            -H "Authorization: Bearer $CI_READ_TOKEN" \
+            "$base/api/v1/experiences")
+          test "$status" = "400"
+          grep -q '"code":"invalid_cursor"' cursor-body.json
+
+          # 3) Without the bearer token the same call is a 401: the decoder path is behind auth.
+          status=$(curl -sS -o unauth-body.json -w '%{http_code}' -G \
+            --data-urlencode "cursor=$cursor" \
+            "$base/api/v1/experiences")
+          test "$status" = "401"
+          grep -q '"code":"unauthorized"' unauth-body.json
+
+          # 4) Tomcat's multipart part-header parser decodes RFC 2047 encoded words with
+          #    java.util.Base64 - a pre-auth Base64 decode path that runs before routing and
+          #    auth. Spring multipart parsing is disabled (no upload feature), so a malformed
+          #    encoded word is an ordinary non-500 response and never reaches the decoder.
+          boundary="----OIEPCIBOUNDARY"
+          {
+            printf -- '--%s\r\n' "$boundary"
+            printf 'Content-Disposition: form-data; name="f"; filename="=?UTF-8?B?%s?="\r\n' "$cursor"
+            printf 'Content-Type: text/plain\r\n\r\nx\r\n'
+            printf -- '--%s--\r\n' "$boundary"
+          } > multipart-body.bin
+          status=$(curl -sS -o multipart-response.bin -w '%{http_code}' \
+            -X POST -H "Content-Type: multipart/form-data; boundary=$boundary" \
+            --data-binary @multipart-body.bin "$base/definitely-not-a-route")
+          test "$status" != "500"
+          if docker logs oiep-ci 2>&1 | grep -qE 'MimeUtility\.decodeWord|Base64\$Decoder\.decode0'; then
+            echo "multipart part-header Base64 decode path was reached" >&2
+            exit 1
+          fi
+
+          # 5) The app survived the probes.
+          curl -fsS "$base/" >/dev/null
+          echo "Java4Shell mitigation, strict read-API cursor and multipart-path assertions passed."
 
       - name: Show container logs
         if: always()

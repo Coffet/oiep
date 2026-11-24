@@ -64,6 +64,8 @@ services:
       # missing admin token. Generate one (32+ chars) and set it in .env.
       OIEP_COMPANION_ADMIN_HELPER_ENABLED: ${OIEP_COMPANION_ADMIN_HELPER_ENABLED:-true}
       OIEP_COMPANION_ADMIN_TOKEN: "${OIEP_COMPANION_ADMIN_TOKEN:?OIEP_COMPANION_ADMIN_TOKEN is required: generate a 32+ character secret and set it in .env (see docs/COMPANION.md)}"
+      # Explicitly opt in only if the unencrypted Compose network is trusted.
+      OIEP_COMPANION_ADMIN_ALLOW_INSECURE_HTTP: ${OIEP_COMPANION_ADMIN_ALLOW_INSECURE_HTTP:-false}
 
       # Read-only experiences API used by the companion's corpus sync. Harmless
       # without a usable token: the endpoint is then not registered at all.

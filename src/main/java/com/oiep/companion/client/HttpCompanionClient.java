@@ -49,6 +49,10 @@ public class HttpCompanionClient implements CompanionClient {
             throw new IllegalStateException(
                     "The AI companion admin helper requires a valid OIEP_COMPANION_BASE_URL and token");
         }
+        if (!CompanionSettingsSupport.adminTransportAllowed(
+                origin, properties.getAdminHelper().isAllowInsecureHttp())) {
+            throw new IllegalStateException("The AI companion admin helper requires HTTPS for non-loopback origins");
+        }
         this.serviceOrigin = origin;
         this.adminToken = token;
         this.requestTimeout = Duration.ofMillis(Math.max(500, properties.getHttp().getRequestTimeoutMs()));

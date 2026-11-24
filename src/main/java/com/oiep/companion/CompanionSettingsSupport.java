@@ -123,6 +123,19 @@ public final class CompanionSettingsSupport {
         return origin;
     }
 
+    /** The admin bearer token may use HTTP only on numeric loopback or by explicit opt-in. */
+    public static boolean adminTransportAllowed(String baseUrl, boolean allowInsecureHttp) {
+        String origin = serviceOrigin(baseUrl);
+        if (origin.isEmpty()) {
+            return false;
+        }
+        URI uri = URI.create(origin);
+        return "https".equals(uri.getScheme())
+                || allowInsecureHttp
+                || "127.0.0.1".equals(uri.getHost())
+                || "[::1]".equals(uri.getHost());
+    }
+
     /** True when both URLs are configured and belong to the same origin. */
     public static boolean sameOrigin(String first, String second) {
         String firstOrigin = originOf(first);

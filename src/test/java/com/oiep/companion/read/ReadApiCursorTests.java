@@ -27,11 +27,36 @@ class ReadApiCursorTests {
     }
 
     @Test
-    void decodeAcceptsPaddedFormToo() {
-        String encoded = new ReadApiCursor(5L, 6L).encode();
+    void rejectsPaddedFormBecauseTheWireFormIsUnpadded() {
+        // A payload whose length is not a multiple of 3, so canonical padding is non-empty.
+        String encoded = new ReadApiCursor(1_762_765_445_123L, 42L).encode();
         String padded = encoded + "=".repeat((4 - encoded.length() % 4) % 4);
 
-        assertThat(ReadApiCursor.decode(padded)).isEqualTo(new ReadApiCursor(5L, 6L));
+        assertThat(padded).isNotEqualTo(encoded);
+        assertInvalid(padded);
+        // Padding is rejected even when the value is short enough for the length guard.
+        assertInvalid("A".repeat(63) + "=");
+    }
+
+    @Test
+    void rejectsCursorsAtOrAboveTheJava4ShellTriggerSize() {
+        // CVE-2026-114938 ("Java4Shell"): a padded Base64 value with a short tail can drive
+        // HotSpot's AVX-512 Base64 decode intrinsic into an out-of-bounds heap write. On JDK 17
+        // the trigger is 128 bytes before the trailing '='. The decoder must never see the
+        // value, whatever the JVM build: the length/charset guard rejects it first.
+        assertInvalid("A".repeat(128) + "=");
+        assertInvalid("A".repeat(64) + "=");
+        assertInvalid("A".repeat(128) + "==");
+    }
+
+    @Test
+    void acceptsTheLongestLegitimateCursor() {
+        ReadApiCursor cursor = new ReadApiCursor(Long.MAX_VALUE, Long.MAX_VALUE);
+
+        String encoded = cursor.encode();
+
+        assertThat(encoded.length()).isLessThanOrEqualTo(64);
+        assertThat(ReadApiCursor.decode(encoded)).isEqualTo(cursor);
     }
 
     @Test
@@ -39,12 +64,15 @@ class ReadApiCursorTests {
         assertInvalid(null);
         assertInvalid("");
         assertInvalid("   ");
+        assertInvalid("a".repeat(65));
         assertInvalid("a".repeat(300));
     }
 
     @Test
     void rejectsNonBase64AndNonNumericPayloads() {
         assertInvalid("@@not-base64@@");
+        assertInvalid("ab+cd");
+        assertInvalid("ab/cd");
         assertInvalid(base64("abc"));
         assertInvalid(base64("1:2:3"));
         assertInvalid(base64(":2"));

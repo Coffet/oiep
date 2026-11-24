@@ -72,6 +72,7 @@ OIEP_COMPANION_BASE_URL=http://ai:8090
 OIEP_COMPANION_USER_HELPER_ENABLED=true
 OIEP_COMPANION_WIDGET_URL=http://127.0.0.1:8090/ui/
 OIEP_COMPANION_ADMIN_HELPER_ENABLED=true
+OIEP_COMPANION_ADMIN_ALLOW_INSECURE_HTTP=true
 OIEP_COMPANION_ADMIN_TOKEN=<32+ random characters>
 OIEP_COMPANION_READ_TOKEN=<16+ random characters>
 OIEP_AI_IP_HASH_SALT=<16+ random characters>
@@ -84,6 +85,8 @@ docker compose -f compose.yaml -f compose.companion.yaml up -d --build
 docker compose -f compose.yaml -f compose.companion.yaml ps     # app + ai healthy
 ```
 
+This explicitly permits an unencrypted admin connection: a network observer can steal the token.
+Use an authenticated HTTPS companion endpoint instead when the network is not fully trusted.
 The companion runs the deterministic `structured-extractive` backend — no model, no download.
 Details, tokens and the removal procedure are in [COMPANION.md](COMPANION.md).
 
@@ -103,6 +106,7 @@ ollama pull qwen2.5:1.5b-instruct-q4_K_M
 
 ```dotenv
 OIEP_COMPANION_BASE_URL=http://host.docker.internal:8091
+OIEP_COMPANION_ADMIN_ALLOW_INSECURE_HTTP=true
 OIEP_COMPANION_WIDGET_URL=http://127.0.0.1:8091/ui/
 ```
 
@@ -175,6 +179,19 @@ $env:OIEP_ADMIN_PASSWORD = "<long random secret>"   # /admin stays disabled with
 
 Open <http://localhost:8080/>. The SQLite file is created at `data/oiep.db` (override with
 `OIEP_DB_PATH`). Optional demo content: `java -jar target\oiep.war --oiep.demo-data=true`.
+
+> **Java4Shell (CVE-2026-114938).** The Docker image in this repo starts its JVM with
+> `-XX:-UseBASE64Intrinsics` because current JDK 17 builds predate the fix. For a bare-metal run,
+> check that your JDK build contains the fix; if it does not, use the same flag:
+>
+> ```powershell
+> $env:JAVA_TOOL_OPTIONS = "-XX:-UseBASE64Intrinsics"
+> java -jar target\oiep.war
+> ```
+>
+> `.\mvnw.cmd spring-boot:run` picks the variable up too. This is a temporary mitigation; the
+> app-level controls (strict read-API cursor parsing and multipart parsing disabled) are
+> independent of it. See the internal `security/java4shell.md` assessment note.
 
 ### 3.2 OIEP + companion, LLM off (extractive)
 

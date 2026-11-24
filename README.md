@@ -41,11 +41,13 @@ The first working slice:
 - **Admin / moderation** — password-protected `/admin` dashboard with note counts, search and status filters, hide/restore, delete-with-confirmation, per-session CSRF tokens, login throttling plus a login-page throttle, session rotation, a hard server-side session cap and no-store admin responses. Failed sign-ins, throttling and moderation actions are written to the security log with the resolved client address.
 - **Optional AI companion (oiep-backendAI)** — a self-contained, disabled-by-default component that plugs the separate local-first AI helper service in: a floating user-helper chat widget on the form page, a read-only experiences API for the companion's corpus sync, and an operator AI helper page at `/admin/assistant`. See [Optional AI companion](#optional-ai-companion-oiep-backendai).
 - **Ops basics** — SQLite out of the box, custom 404/500 pages, XSS-safe JSP output escaping, hash-based CSP with HSTS-on-HTTPS/COOP/CORP/X-Frame-Options, honeypot, per-client rate limiting keyed on the real visitor IP (Cloudflare `CF-Connecting-IP`; client-supplied `X-Forwarded-For` is never trusted), same-origin checks on anonymous POSTs, and cookie-only sessions with `Secure`/`HttpOnly`/`SameSite=Lax`.
-- **Deployment** — multi-stage Docker image, hardened Compose runtime (`cap_drop: ALL`, pids limits, no-new-privileges), persistent SQLite volume, Cloudflare Tunnel service, safe backup/restore scripts, Dependabot updates and a CI Docker smoke test that asserts the security headers, relative admin redirect and session-cookie flags.
+- **Deployment** — multi-stage Docker image, hardened Compose runtime (`cap_drop: ALL`, pids limits, no-new-privileges), persistent SQLite volume, Cloudflare Tunnel service, safe backup/restore scripts, Dependabot updates and a CI Docker smoke test that asserts the security headers, relative admin redirect, session-cookie flags and the current Java4Shell (CVE-2026-114938) mitigations (JVM intrinsic flag, strict read-API cursor, multipart parsing disabled).
 
 ## Run it
 
 Requirements: **JDK 17+**. Maven is not required; the Maven wrapper is included.
+
+Until the JDK 17 build you use carries the Java4Shell (CVE-2026-114938) fix, start the JVM with `-XX:-UseBASE64Intrinsics` (the Docker image sets this for you; the bare-metal notes in [docs/LOCAL-RUN.md](docs/LOCAL-RUN.md) show the flag). Deployment guidance, the base-image update path and the flag-removal condition are in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ### Windows
 

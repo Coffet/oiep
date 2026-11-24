@@ -78,4 +78,18 @@ class HttpCompanionClientTests {
         assertThatThrownBy(() -> client.get("/v1/admin/health"))
                 .isInstanceOf(CompanionUnavailableException.class);
     }
+
+    @Test
+    void clientRejectsRemoteHttpUnlessExplicitlyAllowed() {
+        CompanionProperties properties = new CompanionProperties();
+        properties.setBaseUrl("http://ai.example.org");
+        properties.getAdminHelper().setToken(TOKEN);
+
+        assertThatThrownBy(() -> new HttpCompanionClient(properties))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("HTTPS");
+
+        properties.getAdminHelper().setAllowInsecureHttp(true);
+        assertThat(new HttpCompanionClient(properties)).isNotNull();
+    }
 }

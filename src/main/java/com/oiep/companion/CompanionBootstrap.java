@@ -48,9 +48,16 @@ public class CompanionBootstrap implements ApplicationRunner {
         }
 
         if (properties.getAdminHelper().isEnabled() && !properties.adminHelperUsable()) {
-            log.warn("AI companion admin helper is configured but disabled: tokenProblem={} baseUrlValid={}",
+            log.warn("AI companion admin helper is configured but disabled: tokenProblem={} "
+                            + "baseUrlValid={} adminTransportAllowed={}",
                     CompanionSettingsSupport.secretProblem(properties.getAdminHelper().getToken()),
-                    !properties.serviceOrigin().isEmpty());
+                    !properties.serviceOrigin().isEmpty(),
+                    CompanionSettingsSupport.adminTransportAllowed(properties.getBaseUrl(),
+                            properties.getAdminHelper().isAllowInsecureHttp()));
+        } else if (properties.adminHelperUsable()
+                && !CompanionSettingsSupport.adminTransportAllowed(properties.getBaseUrl(), false)) {
+            log.warn("AI companion admin helper is using explicitly permitted unencrypted HTTP; "
+                    + "the operator token and requests can be intercepted");
         }
 
         if (properties.getReadApi().isEnabled() && !properties.readApiUsable()) {

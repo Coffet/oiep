@@ -102,7 +102,7 @@ public class CompanionProperties {
     public boolean adminHelperUsable() {
         return enabled
                 && adminHelper.isEnabled()
-                && !serviceOrigin().isEmpty()
+                && CompanionSettingsSupport.adminTransportAllowed(baseUrl, adminHelper.isAllowInsecureHttp())
                 && CompanionSettingsSupport.isUsableSecret(adminHelper.getToken());
     }
 
@@ -148,6 +148,9 @@ public class CompanionProperties {
         /** Companion admin bearer token. Server-side only; never sent to the browser. */
         private String token = "";
 
+        /** Permit an unencrypted connection to a non-loopback companion. */
+        private boolean allowInsecureHttp;
+
         public boolean isEnabled() {
             return enabled;
         }
@@ -162,6 +165,14 @@ public class CompanionProperties {
 
         public void setToken(String token) {
             this.token = token == null ? "" : token;
+        }
+
+        public boolean isAllowInsecureHttp() {
+            return allowInsecureHttp;
+        }
+
+        public void setAllowInsecureHttp(boolean allowInsecureHttp) {
+            this.allowInsecureHttp = allowInsecureHttp;
         }
     }
 

@@ -351,9 +351,8 @@ operator must keep in mind:
    `/v1/admin/` public-exposure requirement remains operator configuration.
 3. **Companion runtime was `OIEP_AI_ENV=dev`.** The companion's prod fail-closed checks
    (32+ char admin token, IP-hash salt, `https://` sync/CORS URLs) are its own and were not
-   re-run; the OIEP side has no prod/HTTPS enforcement of `OIEP_COMPANION_BASE_URL` — keep the
-   proxy on loopback/private networking as the docs say, because the operator bearer token
-   travels on that hop in clear text if an operator configures plain HTTP over a network.
+   re-run. OIEP now requires HTTPS for non-loopback admin connections unless insecure HTTP is
+   explicitly enabled; that opt-in leaves the operator bearer token exposed on the network.
 4. **Browser-level CSRF/session semantics** were exercised over plain HTTP with `Secure` cookies
    off (dev), as in the documented local quick start.
 5. **Response-body cap is checked after buffering.** `HttpCompanionClient` reads the full

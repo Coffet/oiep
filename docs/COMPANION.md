@@ -204,6 +204,7 @@ Values copied verbatim from this document or `.env.example` as tokens are detect
 | `oiep.companion.user-helper.widget-url` | `OIEP_COMPANION_WIDGET_URL` | `<base-url>/ui/` | full browser-visible iframe URL; its **origin** becomes the CSP `frame-src` entry | — (served at `/ui/` when `OIEP_AI_UI_ENABLED=true`) |
 | `oiep.companion.admin-helper.enabled` | `OIEP_COMPANION_ADMIN_HELPER_ENABLED` | `false` | expose `/admin/assistant` and its same-origin proxy | — |
 | `oiep.companion.admin-helper.token` | `OIEP_COMPANION_ADMIN_TOKEN` | *(empty)* | companion operator bearer token; server-side only | `OIEP_AI_ADMIN_TOKEN` |
+| `oiep.companion.admin-helper.allow-insecure-http` | `OIEP_COMPANION_ADMIN_ALLOW_INSECURE_HTTP` | `false` | explicitly allow the admin token over non-loopback HTTP; vulnerable to interception | — |
 | `oiep.companion.read-api.enabled` | `OIEP_COMPANION_READ_API_ENABLED` | `false` | expose `GET /api/v1/experiences` | — |
 | `oiep.companion.read-api.token` | `OIEP_COMPANION_READ_TOKEN` | *(empty)* | read-only bearer token presented by the companion | `OIEP_AI_OIEP_SYNC_TOKEN` |
 | `oiep.companion.read-api.page-size` | `OIEP_COMPANION_READ_PAGE_SIZE` | `200` | default page size (clamped 1–500; the service maximum) | the companion requests pages of at most 500 |
@@ -368,7 +369,10 @@ How the overlay wires things:
   `docker compose -f compose.yaml -f compose.companion.yaml pull ai`), and run `up -d` without
   `--build` — otherwise Compose rebuilds from the build context.
 - `app` reaches the companion over the private Compose network at `http://ai:8090`
-  (`OIEP_COMPANION_BASE_URL`), so the admin proxy never crosses the public internet.
+  (`OIEP_COMPANION_BASE_URL`), so the admin proxy never crosses the public internet. This HTTP
+  hop is nevertheless unencrypted: anyone able to observe or intercept it can steal the token.
+  The admin helper remains disabled unless you configure an authenticated HTTPS origin or
+  explicitly accept that risk with `OIEP_COMPANION_ADMIN_ALLOW_INSECURE_HTTP=true`.
 - The companion's SQLite file lives in the `oiep-ai-data` volume.
 - The companion port is published on **loopback only** (`127.0.0.1:8090`) for operator curl/SSH
   tunnels; it is never published on `0.0.0.0`.
@@ -394,8 +398,9 @@ How the overlay wires things:
 
 ### Browser-reachable widget URL (important)
 
-`OIEP_COMPANION_BASE_URL` must stay the **internal** origin (`http://ai:8090`) because the admin
-proxy uses it, but the user-helper iframe is loaded by the **visitor's browser**, which cannot
+The default overlay uses the **internal** origin `http://ai:8090` for
+`OIEP_COMPANION_BASE_URL` (or use an internal authenticated HTTPS endpoint instead).
+The user-helper iframe is loaded by the **visitor's browser**, which cannot
 resolve `ai`. For the widget to work, set `OIEP_COMPANION_WIDGET_URL` to a public URL of the
 companion widget:
 
@@ -410,7 +415,7 @@ companion widget:
   the same machine can reach the loopback-published port.
 - **No public widget:** set `OIEP_COMPANION_USER_HELPER_ENABLED=false` (the overlay defaults the
   user helper to `false` precisely so a missing public URL cannot render a broken iframe). The
-  admin helper and the read API keep working with the internal base URL only.
+  admin helper also needs HTTPS or the explicit insecure-HTTP opt-in; the read API is independent.
 
 ### First-boot checklist for the overlay
 
@@ -419,7 +424,9 @@ companion widget:
    (16+ chars) if you want corpus sync. The overlay's `${VAR:?…}` guards make `docker compose
    config`/`up` fail immediately when the token or salt is missing — fix `.env` and re-run.
    The overlay defaults `OIEP_COMPANION_BASE_URL` to `http://ai:8090`; leave it alone unless you
-   customize the service name.
+   customize the service name. Configure HTTPS for the admin connection, or explicitly set
+   `OIEP_COMPANION_ADMIN_ALLOW_INSECURE_HTTP=true` only if you accept token interception risk
+   on the Compose network.
 2. For sync, set `OIEP_AI_OIEP_BASE_URL=https://your-public-oiep-host` and
    `OIEP_COMPANION_READ_API_ENABLED=true` (the overlay defaults it to `true`).
 3. For the widget, set `OIEP_COMPANION_USER_HELPER_ENABLED=true` **and**
@@ -460,7 +467,7 @@ Authorization: Bearer <OIEP_COMPANION_READ_TOKEN>
 | Parameter | Required | Rule |
 | --- | --- | --- |
 | `updated_since` | no | ISO-8601 instant/offset/local date-time; returns component events strictly after it. Omit for a full sync. |
-| `cursor` | no | opaque continuation token from the previous page; invalid → `400 {"error":{"code":"invalid_cursor"}}` |
+| `cursor` | no | opaque continuation token from the previous page. Only the exact wire form OIEP emits is accepted: unpadded base64url, at most 64 characters (padded, longer or non-URL-safe values are rejected). Invalid → `400 {"error":{"code":"invalid_cursor"}}` |
 | `page_size` | no | 1–500, default `OIEP_COMPANION_READ_PAGE_SIZE` (`200`); an explicit value is clamped (`0`/negative → `1`, `>500` → `500`), a non-integer → `400 invalid_page_size` |
 
 Response `200`:
@@ -921,7 +928,7 @@ trivial. Removing them is optional; if you do, also revert `WebConfig`'s CSP met
 | Widget iframe is blank / browser console says "Refused to frame" | CSP `frame-src` is missing → widget URL invalid, or the companion proxy sends `X-Frame-Options`/`frame-ancestors` without your OIEP origin. Check the response headers of the widget URL; if you use the companion's reference nginx, add your OIEP origin to `frame-ancestors`. |
 | Widget block renders but the frame cannot connect | `OIEP_COMPANION_WIDGET_URL` is `http://` while OIEP runs on HTTPS (mixed content), or the URL points at an internal Docker name (`http://ai:8090`) that the browser cannot resolve. Use a public HTTPS widget URL. |
 | Widget still shows the reviewed template questions although the local model is configured | Phrasing requires the companion's `ollama` backend: check the `/admin/assistant` status card (or the companion's `GET /v1/admin/health`) shows `ollama` and a non-degraded model — after repeated local-model failures the companion opens a circuit breaker and serves templates until it recovers. Also confirm `OIEP_AI_LLM_PHRASE_QUESTIONS` is not `false`. Finally, model wording that fails validation (one question, 5–200 characters, ending with `?`, no links/markdown/emails or interview/coding-question content) is discarded silently: the reviewed template is the documented fallback, so an occasional template question is expected rather than a bug. |
-| `/admin/assistant` is 404 after enabling | The admin-helper condition failed: `OIEP_COMPANION_ADMIN_HELPER_ENABLED` is false, `OIEP_COMPANION_BASE_URL` is not a plain origin, or the token is empty/short/a documented placeholder. The startup log prints the reason (never the token). |
+| `/admin/assistant` is 404 after enabling | The admin-helper condition failed: the helper is disabled, the base URL or token is invalid, or the base URL uses non-loopback HTTP without the explicit insecure-HTTP opt-in. The startup log prints the reason (never the token). |
 | Admin helper shows "The helper service could not be reached" (502) | OIEP cannot reach the companion at `OIEP_COMPANION_BASE_URL` (container name/port, companion down, timeout), the companion answered 5xx/redirect, or the companion rejected the token (mapped to `502 companion_auth_failed`). Check `docker compose ps`, the companion `/readyz`, and that `OIEP_COMPANION_ADMIN_TOKEN` equals `OIEP_AI_ADMIN_TOKEN`. |
 | Token "rejected"/sub-feature stays disabled | The value is a documented placeholder or shorter than 16 characters. Generate a real token. |
 | Read API returns 404 | The read sub-feature is off (`OIEP_COMPANION_READ_API_ENABLED`), the token is unusable, or the master switch is off. Remember there is no HTML page at that path — it is a JSON API. |
