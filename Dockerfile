@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------- build ----------
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /workspace
 
 # Java4Shell (CVE-2026-114938): this stage runs an affected OpenJDK 17 build as well. It only
