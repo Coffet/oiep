@@ -18,7 +18,7 @@ COPY src ./src
 RUN mvn -B -ntp -Dmaven.test.skip=true package
 
 # ---------- runtime ----------
-FROM eclipse-temurin:17-jre-jammy AS runtime
+FROM eclipse-temurin:25-jre-jammy AS runtime
 
 LABEL org.opencontainers.image.title="OIEP" \
       org.opencontainers.image.description="Open Interview Experience Platform" \
